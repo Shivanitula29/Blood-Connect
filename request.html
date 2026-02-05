@@ -1,0 +1,64 @@
+<h3>Blood Request</h3>
+
+Patient Name: <input id="p"><br><br>
+
+Blood Group: <input id="b"><br><br>
+
+Hospital: <input id="h"><br><br>
+
+Location: <input id="l"><br><br>
+
+<button onclick="sendRequest()">Request Blood</button>
+
+<h4 id="msg"></h4>
+
+<div id="res"></div>
+
+
+<script>
+function sendRequest(){
+
+ fetch('/requestBlood', {
+   method: 'POST',
+   headers: {
+      'Content-Type': 'application/json'
+   },
+
+   body: JSON.stringify({
+      patient: document.getElementById("p").value,
+      blood: document.getElementById("b").value,
+      hospital: document.getElementById("h").value,
+      location: document.getElementById("l").value
+   })
+ })
+
+ .then(res => res.json())
+
+.then(data => {
+
+   document.getElementById("msg").innerHTML = data.message
+
+   // ----- Show in Table -----
+   let table = "<table border='1'>"
+   table += "<tr><th>Name</th><th>Blood</th><th>Phone</th><th>Location</th></tr>"
+
+   data.matched_donors.forEach(d => {
+       table += `<tr>
+          <td>${d[1]}</td>
+          <td>${d[2]}</td>
+          <td>${d[3]}</td>
+          <td>${d[4]}</td>
+       </tr>`
+   })
+
+   table += "</table>"
+
+   document.getElementById("res").innerHTML = table
+
+})
+
+
+ .catch(err => alert(err))
+
+}
+</script>

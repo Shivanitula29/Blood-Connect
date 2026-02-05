@@ -1,0 +1,45 @@
+<h3>Donor Registration</h3>
+
+Name: <input id="name"><br><br>
+
+Blood Group: <input id="blood"><br><br>
+
+Phone: <input id="phone"><br><br>
+
+Location: <input id="loc"><br><br>
+
+Last Donated: <input id="last"><br><br>
+
+<button onclick="addDonor()">Register</button>
+
+<p id="msg"></p>
+
+<script>
+function addDonor(){
+
+ fetch('/addDonor', {
+   method: 'POST',
+   headers: {
+      'Content-Type': 'application/json'
+   },
+   body: JSON.stringify({
+      name: document.getElementById("name").value,
+      blood: document.getElementById("blood").value,
+      phone: document.getElementById("phone").value,
+      location: document.getElementById("loc").value,
+      last_donated: document.getElementById("last").value
+   })
+ })
+
+ .then(res => res.json())
+
+ .then(data => {
+    document.getElementById("msg").innerHTML = data.msg
+ })
+
+ .catch(err => {
+    alert("Error: " + err)
+ })
+
+}
+</script>
