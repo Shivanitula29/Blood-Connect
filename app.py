@@ -1,4 +1,3 @@
-from sms import send_sms
 from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 import sqlite3
@@ -31,29 +30,31 @@ def request_page():
 # ---------- API FUNCTIONS ----------
 
 # ➤ ADD DONOR
+# ➤ ADD DONOR
 @app.route('/addDonor', methods=['POST'])
 def add_donor():
+
     data = request.json
+
+    # Normalize values
+    name = data['name'].strip()
+    blood = data['blood'].strip().upper()       # Always uppercase
+    phone = data['phone'].strip()
+    location = data['location'].strip().lower() # Always lowercase
+    last_donated = data['last_donated'].strip()
 
     conn = db()
     cur = conn.cursor()
 
-    cur.execute(
-        "INSERT INTO donors VALUES(NULL,?,?,?,?,?)",
-        (
-            data['name'],
-            data['blood'],
-            data['phone'],
-            data['location'],
-            data['last_donated']
-        )
-    )
+    cur.execute("""
+        INSERT INTO donors (name, blood, phone, location, last_donated)
+        VALUES (?, ?, ?, ?, ?)
+    """, (name, blood, phone, location, last_donated))
 
     conn.commit()
     conn.close()
 
     return jsonify({"msg": "Donor Registered Successfully"})
-
 
 # ➤ REQUEST BLOOD WITH COMPATIBILITY
 @app.route('/requestBlood', methods=['POST'])
@@ -95,11 +96,6 @@ def request_blood():
 
     cur.execute(query, (*groups, data['location']))
     donors = cur.fetchall()
-    # ----- SEND SMS TO MATCHED DONORS -----
-    for d in donors:
-       phone = d[3]
-    msg = f"Emergency Blood Request: {data['blood']} needed at {data['hospital']}. Please help!"
-    send_sms(phone, msg)
 
     conn.commit()
     conn.close()
@@ -141,6 +137,41 @@ def all_requests():
     conn.close()
 
     return jsonify(data)
+
+@app.route('/results', methods=['POST'])
+def results():
+
+    blood = request.form['blood'].strip().upper()
+    location = request.form['location'].strip().lower()
+
+    conn = db()
+    cur = conn.cursor()
+
+    compat = {
+        "O+": ["O+","O-"],
+        "A+": ["A+","A-","O+","O-"],
+        "B+": ["B+","B-","O+","O-"],
+        "AB+": ["A+","A-","B+","B-","O+","O-","AB+","AB-"],
+        "O-": ["O-"],
+        "A-": ["A-","O-"],
+        "B-": ["B-","O-"],
+        "AB-": ["AB-","A-","B-","O-"]
+    }
+
+    groups = compat.get(blood, [blood])
+
+    query = f"""
+        SELECT * FROM donors
+        WHERE UPPER(blood) IN ({','.join('?'*len(groups))})
+        AND LOWER(location) = ?
+    """
+
+    cur.execute(query, (*groups, location))
+    donors = cur.fetchall()
+
+    conn.close()
+
+    return render_template("results.html", donors=donors, location=location)
 
 
 # ---------- RUN ----------
