@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Available Donors</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<div class="navbar">
+    <div class="menu">☰</div>
+    <div class="logo">BloodConnect</div>
+    <div class="nav-links">
+        <a href="/">Home</a>
+        <a href="/donor">Register</a>
+    </div>
+</div>
+
+<div style="text-align:center; margin-top:40px;">
+    <h2>Available Donors in {{ location }}</h2>
+</div>
+
+<!-- FILTER SECTION -->
+<div style="text-align:center; margin:20px;">
+    <form method="POST" action="/results">
+        <input name="blood" placeholder="Blood Group">
+        <input name="location" placeholder="Location">
+        <button type="submit">Filter</button>
+    </form>
+</div>
+
+<!-- DONOR CARDS -->
+<div style="display:flex; flex-wrap:wrap; justify-content:center; gap:20px; margin-top:30px;">
+
+{% if donors %}
+    {% for donor in donors %}
+        <div class="card" style="width:280px;">
+            <h3>{{ donor[1] }}</h3>
+            <p><b>Blood:</b> {{ donor[2] }}</p>
+            <p><b>Phone:</b> {{ donor[3] }}</p>
+            <p><b>Location:</b> {{ donor[4] }}</p>
+            <p><b>Last Donated:</b> {{ donor[5] }}</p>
+        </div>
+    {% endfor %}
+{% else %}
+    <h3>No matching donors found.</h3>
+{% endif %}
+
+</div>
+
+
+</body>
+</html>
