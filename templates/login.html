@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Sign In</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<div class="navbar">
+    <div class="menu">☰</div>
+    <div class="logo">BloodConnect</div>
+    <div class="nav-links">
+        {% if user %}
+            <a href="/">Home</a>
+            <a href="/profile">Profile</a>
+            <a href="/logout">Logout</a>
+        {% else %}
+            <a href="/">Home</a>
+            <a href="/signup">Sign Up</a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card">
+    <h2>Sign In</h2>
+    <p class="card-subtitle">
+        Login using your email or phone number
+    </p>
+
+    <form method="POST" action="/login" id="loginForm" onsubmit="return showLoginStatus()">
+
+        <label>Email or Phone</label>
+        <input 
+            type="text" 
+            name="identifier" 
+            placeholder="Enter email or phone number" 
+            required
+        >
+
+        <label>Password</label>
+        <input 
+            type="password" 
+            name="password" 
+            placeholder="Enter your password" 
+            required
+        >
+
+        <button type="submit" class="primary-btn submit-btn">
+            Login
+        </button>
+    </form>
+
+    <p id="loginMsg"></p>
+
+    {% if error %}
+        <p style="color:red; margin-top:15px;">{{ error }}</p>
+    {% endif %}
+
+    {% if success %}
+        <p style="color:green; margin-top:15px; font-weight:600;">{{ success }}</p>
+    {% endif %}
+
+    <p style="margin-top:15px; text-align:center;">
+        Don’t have an account? 
+        <a href="/signup" style="color:#d63333; font-weight:600;">Sign Up</a>
+    </p>
+
+</div>
+
+<script>
+function showLoginStatus() {
+    const msg = document.getElementById('loginMsg');
+    msg.innerHTML = '<span class="loading"></span>Logging you in...';
+    msg.style.color = '#1f7a3d';
+    return true;
+}
+</script>
+
+</body>
+</html>

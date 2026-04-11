@@ -1,0 +1,283 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Available Donors</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<div class="navbar">
+    <div class="menu">☰</div>
+    <div class="logo">BloodConnect</div>
+    <div class="nav-links">
+        {% if user %}
+            <a href="/">Home</a>
+            <a href="/profile">Profile</a>
+            <a href="/logout">Logout</a>
+        {% else %}
+            <a href="/">Home</a>
+            <a href="/login">Sign In</a>
+            <a href="/signup">Sign Up</a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="results-wrapper">
+
+    <div class="results-header">
+        <h2>Compatible Donors & Blood Banks</h2>
+        <p>Select donors and blood banks to send your request to</p>
+    </div>
+
+    {% if donor_message %}
+    <div class="alert-message">
+        {{ donor_message }}
+    </div>
+    {% endif %}
+
+    <form id="requestForm" method="POST" action="/send-request">
+        <input type="hidden" name="request_id" value="{{ request_id }}">
+        <input type="hidden" name="is_emergency" value="{{ '1' if is_emergency else '0' }}">
+
+        <div class="split-results">
+
+            <div class="results-column">
+                <div class="section-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3 class="section-title">Compatible Donors</h3>
+                    <button type="button" class="secondary-btn" onclick="selectAllDonors()">Select All Donors</button>
+                </div>
+
+                {% if donors %}
+                <div class="donor-grid two-col-grid">
+                    {% for donor in donors %}
+                    <div class="donor-card">
+                        <div style="display: flex; align-items: flex-start; gap: 10px;">
+                            <input type="checkbox" name="selected_donors" value="{{ donor.id }}" onchange="checkSelections()">
+                            <div style="flex: 1;" onclick="openDonorModal('{{ donor.name }}','{{ donor.blood }}','{{ donor.phone }}','{{ donor.location }}','{{ donor.last_donated }}')">
+                                <span class="tag">{{ donor.blood }}</span>
+                                <h3>{{ donor.name }}</h3>
+                                <p><b>Location:</b> {{ donor.location }}</p>
+                                <p><b>Last Donated:</b> {{ donor.last_donated }}</p>
+                                {% if donor.distance is not none %}
+                                    <p><b>Distance:</b> {{ "%.2f"|format(donor.distance) }} km away</p>
+                                {% else %}
+                                    <p><b>Distance:</b> Not available</p>
+                                {% endif %}
+                                <p><b>Contact:</b> Available on request</p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state">
+                    <h3>No matching donors found.</h3>
+                    <p>Try checking nearby blood banks.</p>
+                </div>
+                {% endif %}
+            </div>
+
+            <div class="results-column">
+                <div class="section-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    <h3 class="section-title">Nearby Blood Banks</h3>
+                    <button type="button" class="secondary-btn" onclick="selectAllBanks()">Select All Blood Banks</button>
+                </div>
+
+                {% if blood_banks %}
+                <div class="donor-grid two-col-grid">
+                    {% for bank in blood_banks %}
+                    <div class="donor-card">
+                        <div style="display: flex; align-items: flex-start; gap: 10px;">
+                            <input type="checkbox" name="selected_banks" value="{{ bank.id }}" onchange="checkSelections()">
+                            <div style="flex: 1;" data-name="{{ bank.name|e }}"
+                                 data-phone="{{ bank.phone|e }}"
+                                 data-location="{{ bank.location|e }}"
+                                 data-distance="{{ bank.distance if bank.distance is not none else '' }}"
+                                 data-inventory="{{ bank.blood_groups_available|e }}"
+                                 onclick="openBloodBankModalFromCard(this)">
+                                <span class="tag">{{ requested_blood }}</span>
+                                <h3>{{ bank.name }}</h3>
+                                <p><b>Location:</b> {{ bank.location }}</p>
+                                {% if bank.distance is not none %}
+                                    <p><b>Distance:</b> {{ "%.2f"|format(bank.distance) }} km away</p>
+                                {% else %}
+                                    <p><b>Distance:</b> Not available</p>
+                                {% endif %}
+                                <p><b>Contact:</b> {{ bank.phone }}</p>
+                                <p><b>Inventory:</b> Tap to view available blood groups</p>
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state">
+                    <h3>No matching blood banks found.</h3>
+                    <p>No blood banks with {{ requested_blood }} were found.</p>
+                </div>
+                {% endif %}
+            </div>
+
+        </div>
+
+        <div style="text-align: center; margin: 30px 0;">
+            <button type="submit" id="sendRequestBtn" class="primary-btn">Send Request</button>
+        </div>
+    </form>
+
+</div>
+
+<div class="modal" id="donorModal">
+    <div class="modal-content">
+        <button class="close-x" onclick="closeDonorModal()">&times;</button>
+
+        <h3 id="modalName"></h3>
+        <p><b>Blood Group:</b> <span id="modalBlood"></span></p>
+        <p><b>Location:</b> <span id="modalLocation"></span></p>
+        <p><b>Last Donated:</b> <span id="modalDate"></span></p>
+        <p><b>Donation Readiness:</b> <span id="modalEligibility"></span></p>
+
+        <div id="eligibilityBadge" class="status-badge"></div>
+
+        <div class="modal-actions">
+            <a id="callLink" class="call-btn">Call Donor</a>
+            <button class="close-btn" onclick="closeDonorModal()">Close</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="bloodBankModal">
+    <div class="modal-content">
+        <button class="close-x" onclick="closeBloodBankModal()">&times;</button>
+
+        <h3 id="bankModalName"></h3>
+        <p><b>Location:</b> <span id="bankModalLocation"></span></p>
+        <p><b>Distance:</b> <span id="bankModalDistance"></span></p>
+        <p><b>Contact:</b> <span id="bankModalPhone"></span></p>
+
+        <h4 class="inventory-title">Available Blood Inventory</h4>
+        <div id="bankInventoryList" class="inventory-modal-list"></div>
+
+        <div class="modal-actions">
+            <a id="bankCallLink" class="call-btn">Call Blood Bank</a>
+            <button class="close-btn" onclick="closeBloodBankModal()">Close</button>
+        </div>
+    </div>
+</div>
+
+<script>
+function calculateEligibility(lastDonated) {
+    if (!lastDonated) return {text: "Unknown", eligible: false};
+
+    const donatedDate = new Date(lastDonated);
+    const today = new Date();
+    const diffDays = Math.floor((today - donatedDate) / (1000 * 60 * 60 * 24));
+
+    if (diffDays >= 90) {
+        return {text: "Eligible to donate", eligible: true};
+    } else {
+        return {text: "Recently donated", eligible: false};
+    }
+}
+
+function openDonorModal(name, blood, phone, location, date) {
+    document.getElementById("modalName").innerText = name;
+    document.getElementById("modalBlood").innerText = blood;
+    document.getElementById("modalLocation").innerText = location;
+    document.getElementById("modalDate").innerText = date;
+
+    const eligibility = calculateEligibility(date);
+    document.getElementById("modalEligibility").innerText = eligibility.text;
+
+    const badge = document.getElementById("eligibilityBadge");
+    badge.innerText = eligibility.text;
+    badge.className = "status-badge " + (eligibility.eligible ? "eligible" : "not-eligible");
+
+    document.getElementById("callLink").href = "tel:" + phone;
+    document.getElementById("donorModal").style.display = "flex";
+}
+
+function closeDonorModal() {
+    document.getElementById("donorModal").style.display = "none";
+}
+
+function openBloodBankModalFromCard(card) {
+    const name = card.dataset.name || "";
+    const phone = card.dataset.phone || "";
+    const location = card.dataset.location || "";
+    const distance = card.dataset.distance || "";
+    const inventory = card.dataset.inventory || "";
+
+    openBloodBankModal(name, phone, location, distance, inventory);
+}
+
+function openBloodBankModal(name, phone, location, distance, inventoryString) {
+    document.getElementById("bankModalName").innerText = name;
+    document.getElementById("bankModalLocation").innerText = location;
+    document.getElementById("bankModalDistance").innerText =
+        distance ? `${parseFloat(distance).toFixed(2)} km away` : "Not available";
+    document.getElementById("bankModalPhone").innerText = phone;
+    document.getElementById("bankCallLink").href = "tel:" + phone;
+
+    const inventoryList = document.getElementById("bankInventoryList");
+    inventoryList.innerHTML = "";
+
+    const items = inventoryString.split(",");
+
+    items.forEach(item => {
+        const row = document.createElement("div");
+        row.className = "inventory-modal-row";
+
+        let group = item.trim();
+        let units = "";
+
+        if (item.includes(":")) {
+            const parts = item.split(":");
+            group = parts[0].trim();
+            units = parts[1].trim();
+        }
+
+        row.innerHTML = `
+            <div class="inventory-modal-group">${group}</div>
+            <div class="inventory-modal-units">${units ? units + " units" : ""}</div>
+        `;
+
+        inventoryList.appendChild(row);
+    });
+
+    document.getElementById("bloodBankModal").style.display = "flex";
+}
+
+function closeBloodBankModal() {
+    document.getElementById("bloodBankModal").style.display = "none";
+}
+
+function selectAllDonors() {
+    const checkboxes = document.querySelectorAll('input[name="selected_donors"]');
+    const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+    checkboxes.forEach(cb => cb.checked = !allChecked);
+    checkSelections();
+}
+
+function selectAllBanks() {
+    const checkboxes = document.querySelectorAll('input[name="selected_banks"]');
+    const allChecked = Array.from(checkboxes).every(cb => cb.checked);
+    checkboxes.forEach(cb => cb.checked = !allChecked);
+    checkSelections();
+}
+
+function checkSelections() {
+    const donorCheckboxes = document.querySelectorAll('input[name="selected_donors"]:checked');
+    const bankCheckboxes = document.querySelectorAll('input[name="selected_banks"]:checked');
+    const sendBtn = document.getElementById('sendRequestBtn');
+    if (donorCheckboxes.length > 0 || bankCheckboxes.length > 0) {
+        sendBtn.style.display = 'inline-block';
+    } else {
+        sendBtn.style.display = 'none';
+    }
+}
+</script>
+
+</body>
+</html>

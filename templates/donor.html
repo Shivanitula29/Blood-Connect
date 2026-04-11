@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Become a Donor</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <style>
+        .success-overlay {
+            position: fixed;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.45);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .success-overlay.show {
+            display: flex;
+        }
+
+        .success-card {
+            background: #fff;
+            width: 380px;
+            max-width: 100%;
+            border-radius: 18px;
+            padding: 28px 24px;
+            text-align: center;
+            box-shadow: 0 12px 35px rgba(0,0,0,0.18);
+            animation: popUp 0.3s ease;
+        }
+
+        .success-icon {
+            width: 72px;
+            height: 72px;
+            margin: 0 auto 14px;
+            border-radius: 50%;
+            background: #eafaf0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 34px;
+            color: #1fa34a;
+            font-weight: bold;
+            box-shadow: 0 0 0 10px rgba(31, 163, 74, 0.08);
+        }
+
+        .success-card h3 {
+            margin: 10px 0 8px;
+            color: #222;
+        }
+
+        .success-card p {
+            margin: 0 0 20px;
+            color: #555;
+            font-size: 15px;
+            line-height: 1.5;
+        }
+
+        .popup-buttons {
+            display: flex;
+            gap: 12px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .popup-btn {
+            border: none;
+            padding: 11px 18px;
+            border-radius: 10px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 600;
+            transition: transform 0.2s ease, opacity 0.2s ease;
+            min-width: 110px;
+        }
+
+        .popup-btn:hover {
+            transform: translateY(-1px);
+            opacity: 0.95;
+        }
+
+        .ok-btn {
+            background: #d62828;
+            color: white;
+        }
+
+        .edit-btn {
+            background: #f1f1f1;
+            color: #222;
+        }
+
+        @keyframes popUp {
+            from {
+                transform: scale(0.9);
+                opacity: 0;
+            }
+            to {
+                transform: scale(1);
+                opacity: 1;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="navbar">
+    <div class="menu">☰</div>
+    <div class="logo">BloodConnect</div>
+    <div class="nav-links">
+        {% if user %}
+            <a href="/">Home</a>
+            <a href="/profile">Profile</a>
+            <a href="/logout">Logout</a>
+        {% else %}
+            <a href="/">Home</a>
+            <a href="/login">Sign In</a>
+            <a href="/signup">Sign Up</a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card">
+    <h2>Become a Life Saver</h2>
+    <p class="card-subtitle">Register as a donor and help save lives in your area.</p>
+
+    <form id="donorForm" onsubmit="event.preventDefault(); register();">
+        <label>Full Name</label>
+        <input type="text" placeholder="Enter your full name" id="name" required>
+
+        <label>Age</label>
+        <input type="number" id="age" placeholder="Enter age" required min="18">
+
+        <label>Weight (kg)</label>
+        <input type="number" id="weight" placeholder="Enter weight in kg" required min="45">
+
+        <label>Blood Group</label>
+        <select id="blood" required>
+            <option value="">Select Blood Group</option>
+            <option value="A+">A+</option>
+            <option value="A-">A-</option>
+            <option value="B+">B+</option>
+            <option value="B-">B-</option>
+            <option value="O+">O+</option>
+            <option value="O-">O-</option>
+            <option value="AB+">AB+</option>
+            <option value="AB-">AB-</option>
+        </select>
+
+        <label>Phone Number</label>
+        <input type="text" placeholder="Enter phone number" id="phone" required>
+
+        <label>Location</label>
+        <input type="text" placeholder="Type your area / city" id="location" autocomplete="off" required>
+        <div id="suggestions" class="suggestions-box"></div>
+
+        <input type="hidden" id="latitude">
+        <input type="hidden" id="longitude">
+
+        <button type="button" class="secondary-btn" onclick="useMyLocation()">Use My Current Location</button>
+
+        <label>Last Donated Date</label>
+        <input type="date" id="date" required>
+
+        <div style="margin-top: 20px; text-align: center;">
+            <button type="submit" class="primary-btn submit-btn" onclick="register()">
+                Join as Donor
+            </button>
+        </div>
+    </form>
+
+    <h4 id="msg"></h4>
+</div>
+
+<!-- Success Popup -->
+<div class="success-overlay" id="successOverlay">
+    <div class="success-card">
+        <div class="success-icon">✓</div>
+        <h3>Successfully Registered</h3>
+        <p>Your donor information has been saved successfully.</p>
+
+        <div class="popup-buttons">
+            <button type="button" class="popup-btn ok-btn" onclick="handleOk()">OK</button>
+            <button type="button" class="popup-btn edit-btn" onclick="handleEdit()">Edit Info</button>
+        </div>
+    </div>
+</div>
+
+<script>
+let debounceTimer;
+
+// prevent future date selection
+document.getElementById("date").max = new Date().toISOString().split("T")[0];
+
+document.getElementById("location").addEventListener("input", function () {
+    const query = this.value.trim();
+    clearTimeout(debounceTimer);
+
+    if (query.length < 3) {
+        document.getElementById("suggestions").innerHTML = "";
+        return;
+    }
+
+    debounceTimer = setTimeout(() => {
+        fetchLocationSuggestions(query);
+    }, 400);
+});
+
+async function fetchLocationSuggestions(query) {
+    const suggestionsBox = document.getElementById("suggestions");
+
+    try {
+        const response = await fetch(
+            `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(query)}&limit=5`
+        );
+        const data = await response.json();
+
+        suggestionsBox.innerHTML = "";
+
+        if (!data.length) {
+            suggestionsBox.innerHTML = `<div class="suggestion-item">No matching locations found</div>`;
+            return;
+        }
+
+        data.forEach(place => {
+            const item = document.createElement("div");
+            item.className = "suggestion-item";
+            item.textContent = place.display_name;
+
+            item.onclick = function () {
+                document.getElementById("location").value = place.display_name;
+                document.getElementById("latitude").value = place.lat;
+                document.getElementById("longitude").value = place.lon;
+                suggestionsBox.innerHTML = "";
+                document.getElementById("msg").innerHTML = "Location selected.";
+                document.getElementById("msg").style.color = "green";
+            };
+
+            suggestionsBox.appendChild(item);
+        });
+
+    } catch (error) {
+        suggestionsBox.innerHTML = "";
+        console.log(error);
+    }
+}
+
+function useMyLocation() {
+    const msg = document.getElementById("msg");
+
+    if (!navigator.geolocation) {
+        msg.style.color = "red";
+        msg.innerHTML = "Geolocation is not supported by your browser.";
+        return;
+    }
+
+    msg.style.color = "#222";
+    msg.innerHTML = "Fetching your current location...";
+
+    navigator.geolocation.getCurrentPosition(
+        async function(position) {
+            const lat = position.coords.latitude;
+            const lon = position.coords.longitude;
+
+            document.getElementById("latitude").value = lat;
+            document.getElementById("longitude").value = lon;
+
+            try {
+                const response = await fetch(
+                    `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`
+                );
+                const data = await response.json();
+
+                let place =
+                    data.address?.city ||
+                    data.address?.town ||
+                    data.address?.village ||
+                    data.address?.suburb ||
+                    data.display_name ||
+                    "Current Location";
+
+                document.getElementById("location").value = place;
+                document.getElementById("suggestions").innerHTML = "";
+                msg.style.color = "green";
+                msg.innerHTML = "Current location detected successfully.";
+            } catch (error) {
+                document.getElementById("location").value = `${lat}, ${lon}`;
+                msg.style.color = "green";
+                msg.innerHTML = "Coordinates captured, but place name not found.";
+            }
+        },
+        function() {
+            msg.style.color = "red";
+            msg.innerHTML = "Unable to retrieve your location.";
+        }
+    );
+}
+
+function register() {
+    const name = document.getElementById("name");
+    const age = document.getElementById("age");
+    const weight = document.getElementById("weight");
+    const blood = document.getElementById("blood");
+    const phone = document.getElementById("phone");
+    const location = document.getElementById("location");
+    const latitude = document.getElementById("latitude");
+    const longitude = document.getElementById("longitude");
+    const date = document.getElementById("date");
+    const msg = document.getElementById("msg");
+
+    if (
+        name.value.trim() === "" ||
+        age.value.trim() === "" ||
+        weight.value.trim() === "" ||
+        blood.value.trim() === "" ||
+        phone.value.trim() === "" ||
+        location.value.trim() === "" ||
+        date.value.trim() === ""
+    ) {
+        msg.style.color = "red";
+        msg.innerHTML = "Please fill all fields.";
+        return;
+    }
+
+    if (parseInt(age.value) < 18) {
+        msg.style.color = "red";
+        msg.innerHTML = "Minimum age is 18.";
+        return;
+    }
+
+    if (parseFloat(weight.value) < 45) {
+        msg.style.color = "red";
+        msg.innerHTML = "Minimum weight is 45 kg.";
+        return;
+    }
+
+    msg.style.color = "#333";
+    msg.innerHTML = "<span class='loading'></span>Registering as donor...";
+
+    fetch('/addDonor', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({
+            name: name.value,
+            age: age.value,
+            weight: weight.value,
+            blood: blood.value,
+            phone: phone.value,
+            location: location.value,
+            latitude: latitude.value,
+            longitude: longitude.value,
+            last_donated: date.value
+        })
+    })
+    .then(res => res.json())
+    .then(data => {
+        if (data.msg && data.msg.toLowerCase().includes("success")) {
+            document.getElementById("successOverlay").classList.add("show");
+            msg.innerHTML = "";
+        } else {
+            msg.style.color = "red";
+            msg.innerHTML = data.msg || "Registration failed.";
+        }
+    })
+    .catch(error => {
+        msg.style.color = "red";
+        msg.innerHTML = "Something went wrong!";
+        console.log(error);
+    });
+}
+
+function handleOk() {
+    document.getElementById("successOverlay").classList.remove("show");
+    document.getElementById("donorForm").reset();
+    document.getElementById("latitude").value = "";
+    document.getElementById("longitude").value = "";
+    document.getElementById("suggestions").innerHTML = "";
+    document.getElementById("msg").innerHTML = "";
+    document.getElementById("date").max = new Date().toISOString().split("T")[0];
+}
+
+function handleEdit() {
+    document.getElementById("successOverlay").classList.remove("show");
+    document.getElementById("msg").style.color = "#222";
+    document.getElementById("msg").innerHTML = "You can edit your information now.";
+}
+
+document.addEventListener("click", function(e) {
+    if (e.target.id !== "location") {
+        document.getElementById("suggestions").innerHTML = "";
+    }
+});
+</script>
+
+</body>
+</html>

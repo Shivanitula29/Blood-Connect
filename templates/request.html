@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Request Blood</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<div class="navbar">
+    <div class="menu">☰</div>
+    <div class="logo">BloodConnect</div>
+    <div class="nav-links">
+        {% if user %}
+            <a href="/">Home</a>
+            <a href="/profile">Profile</a>
+            <a href="/logout">Logout</a>
+        {% else %}
+            <a href="/">Home</a>
+            <a href="/login">Sign In</a>
+            <a href="/signup">Sign Up</a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card">
+    <h2>Request Blood</h2>
+    <p class="card-subtitle">
+        Enter patient and hospital details to create a blood request.
+    </p>
+
+
+    <form id="requestForm">
+
+        <label>Patient Name</label>
+        <input type="text" id="patient_name" placeholder="Enter patient name" required>
+
+        <label>Gender</label>
+        <select id="gender" required>
+            <option value="">Select Gender</option>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+            <option value="Other">Other</option>
+        </select>
+
+        <label>Age</label>
+        <input type="number" id="age" placeholder="Enter age" required>
+
+        <label>Blood Group Required</label>
+        <select id="blood" required>
+            <option value="">Select Blood Group</option>
+            <option value="A+">A+</option>
+            <option value="A-">A-</option>
+            <option value="B+">B+</option>
+            <option value="B-">B-</option>
+            <option value="O+">O+</option>
+            <option value="O-">O-</option>
+            <option value="AB+">AB+</option>
+            <option value="AB-">AB-</option>
+        </select>
+
+        <label>Units Required</label>
+        <input type="number" id="units_required" placeholder="Enter number of units" required>
+
+        <label>Hospital Name</label>
+        <input type="text" id="hospital" placeholder="Enter hospital name" required>
+
+        <label>Contact Number</label>
+        <input type="text" id="contact_number" placeholder="Enter contact number" required>
+
+        <label>Location</label>
+        <input type="text" id="location" placeholder="Type hospital area / city" autocomplete="off" required>
+        <div id="suggestions" class="suggestions-box"></div>
+
+        <input type="hidden" id="latitude">
+        <input type="hidden" id="longitude">
+
+
+        <button type="button" class="secondary-btn" onclick="useMyLocation()">
+            Use My Current Location
+        </button>
+
+        <div style="margin-top: 20px; text-align: center;">
+            <button type="button" class="primary-btn submit-btn" onclick="submitRequest()">
+                Submit Request
+            </button>
+        </div>
+    </form>
+
+    <p id="msg"></p>
+</div>
+
+<script>
+let debounceTimer;
+
+document.getElementById("location").addEventListener("input", function () {
+    const query = this.value.trim();
+    clearTimeout(debounceTimer);
+
+    if (query.length < 3) {
+        document.getElementById("suggestions").innerHTML = "";
+        return;
+    }
+
+    debounceTimer = setTimeout(() => {
+        fetchLocationSuggestions(query);
+    }, 400);
+});
+
+async function fetchLocationSuggestions(query) {
+    const suggestionsBox = document.getElementById("suggestions");
+
+    try {
+        const response = await fetch(
+            `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(query)}&limit=5`
+        );
+        const data = await response.json();
+
+        suggestionsBox.innerHTML = "";
+
+        if (!data.length) {
+            suggestionsBox.innerHTML = `<div class="suggestion-item">No matching locations found</div>`;
+            return;
+        }
+
+        data.forEach(place => {
+            const item = document.createElement("div");
+            item.className = "suggestion-item";
+            item.textContent = place.display_name;
+
+            item.onclick = function () {
+                document.getElementById("location").value = place.display_name;
+                document.getElementById("latitude").value = place.lat;
+                document.getElementById("longitude").value = place.lon;
+                suggestionsBox.innerHTML = "";
+                document.getElementById("msg").innerHTML = "Location selected.";
+            };
+
+            suggestionsBox.appendChild(item);
+        });
+
+    } catch (error) {
+        suggestionsBox.innerHTML = "";
+        console.log(error);
+    }
+}
+
+function useMyLocation() {
+    const msg = document.getElementById("msg");
+
+    if (!navigator.geolocation) {
+        msg.innerHTML = "Geolocation is not supported by your browser.";
+        return;
+    }
+
+    msg.innerHTML = "Fetching your current location...";
+
+    navigator.geolocation.getCurrentPosition(
+        async function(position) {
+            const lat = position.coords.latitude;
+            const lon = position.coords.longitude;
+
+            document.getElementById("latitude").value = lat;
+            document.getElementById("longitude").value = lon;
+
+            try {
+                const response = await fetch(
+                    `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`
+                );
+                const data = await response.json();
+
+                let place =
+                    data.address?.city ||
+                    data.address?.town ||
+                    data.address?.village ||
+                    data.address?.suburb ||
+                    data.display_name ||
+                    "Current Location";
+
+                document.getElementById("location").value = place;
+                document.getElementById("suggestions").innerHTML = "";
+                msg.innerHTML = "Current location detected successfully.";
+            } catch (error) {
+                document.getElementById("location").value = `${lat}, ${lon}`;
+                msg.innerHTML = "Coordinates captured, but place name not found.";
+            }
+        },
+        function() {
+            msg.innerHTML = "Unable to retrieve your location.";
+        }
+    );
+}
+
+function submitRequest() {
+    const msg = document.getElementById("msg");
+
+    const data = {
+        patient_name: document.getElementById("patient_name").value.trim(),
+        gender: document.getElementById("gender").value.trim(),
+        age: document.getElementById("age").value.trim(),
+        blood: document.getElementById("blood").value.trim(),
+        units_required: document.getElementById("units_required").value.trim(),
+        hospital: document.getElementById("hospital").value.trim(),
+        contact_number: document.getElementById("contact_number").value.trim(),
+        location: document.getElementById("location").value.trim(),
+        latitude: document.getElementById("latitude").value.trim(),
+        longitude: document.getElementById("longitude").value.trim(),
+        show_blood_banks: "yes"
+    };
+
+    for (let key in data) {
+        if (key !== "latitude" && key !== "longitude" && key !== "show_blood_banks" && data[key] === "") {
+            msg.innerHTML = "Please fill all required fields.";
+            return;
+        }
+    }
+
+    msg.innerHTML = "<span class='loading'></span>Submitting request...";
+
+    fetch('/requestBlood', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify(data)
+    })
+    .then(res => res.json())
+    .then(response => {
+        if (response.request_id) {
+            msg.innerHTML = "<div class='success-animation'>✅ Request submitted successfully! Redirecting to results...</div>";
+            msg.style.color = "green";
+            localStorage.setItem("lastRequestId", response.request_id);
+            setTimeout(() => {
+                window.location.href = `/results/${response.request_id}`;
+            }, 1500);
+        } else {
+            msg.innerHTML = response.message || "Unable to open results.";
+            msg.style.color = "red";
+        }
+    })
+    .catch(error => {
+        msg.innerHTML = "Something went wrong!";
+        console.log(error);
+    });
+}
+
+</script>
+
+</body>
+</html>

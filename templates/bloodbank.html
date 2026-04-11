@@ -1,0 +1,353 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Blood Bank Registration</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+
+<div class="navbar">
+    <div class="menu">☰</div>
+    <div class="logo">BloodConnect</div>
+    <div class="nav-links">
+        {% if user %}
+            <a href="/">Home</a>
+            <a href="/profile">Profile</a>
+            <a href="/logout">Logout</a>
+        {% else %}
+            <a href="/">Home</a>
+            <a href="/login">Sign In</a>
+            <a href="/signup">Sign Up</a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card">
+    <h2>Register Blood Bank</h2>
+    <p class="card-subtitle">Add blood groups, available units, and location details</p>
+
+    {% if success %}
+        <p class="success-msg">{{ success }}</p>
+    {% endif %}
+
+    {% if error %}
+        <p class="error-msg">{{ error }}</p>
+    {% endif %}
+
+    <form action="/addBloodBank" method="POST" onsubmit="return prepareBloodBankData()">
+
+        <label>Blood Bank Name</label>
+        <input type="text" name="name" required>
+
+        <label>Email Address</label>
+        <input type="email" name="email" required>
+
+        <label>Password</label>
+        <input type="password" name="password" required>
+
+        <label>Select Blood Group</label>
+        <select id="blood_group_select">
+            <option value="">Select Blood Group</option>
+            <option value="A+">A+</option>
+            <option value="A-">A-</option>
+            <option value="B+">B+</option>
+            <option value="B-">B-</option>
+            <option value="O+">O+</option>
+            <option value="O-">O-</option>
+            <option value="AB+">AB+</option>
+            <option value="AB-">AB-</option>
+        </select>
+
+        <label>Available Units</label>
+        <input type="number" id="blood_units" placeholder="Enter number of units" min="1">
+
+        <button type="button" class="secondary-btn" onclick="addBloodGroupItem()">
+            Add Blood Group
+        </button>
+
+        <div id="bloodGroupList" class="inventory-list"></div>
+
+        <input type="hidden" name="blood_groups_available" id="blood_groups_available">
+
+        <label>Contact Number</label>
+        <input type="text" name="phone" required>
+
+        <label>Location</label>
+        <input type="text" id="location" name="location" placeholder="Type area / city / hospital address" autocomplete="off" required>
+        <div id="suggestions" class="suggestions-box"></div>
+
+        <input type="hidden" id="latitude" name="latitude">
+        <input type="hidden" id="longitude" name="longitude">
+
+        <button type="button" class="secondary-btn" onclick="useMyLocation()">
+            Use My Current Location
+        </button>
+
+        <div style="margin-top: 20px; text-align: center;">
+            <button type="submit" class="primary-btn submit-btn">
+                🏥 Register Blood Bank
+            </button>
+        </div>
+    </form>
+
+    <p id="msg"></p>
+</div>
+
+<div class="card">
+    <h2>Update Blood Stock</h2>
+    <p class="card-subtitle">Update available blood groups and units for your blood bank</p>
+
+    <form id="updateStockForm">
+        <label>Blood Group</label>
+        <select id="update_blood_group">
+            <option value="">Select Blood Group</option>
+            <option value="A+">A+</option>
+            <option value="A-">A-</option>
+            <option value="B+">B+</option>
+            <option value="B-">B-</option>
+            <option value="O+">O+</option>
+            <option value="O-">O-</option>
+            <option value="AB+">AB+</option>
+            <option value="AB-">AB-</option>
+        </select>
+
+        <label>Units Available</label>
+        <input type="number" id="update_units" min="0">
+
+        <button type="button" onclick="updateStock()" class="primary-btn submit-btn">Update Stock</button>
+    </form>
+
+    <p id="updateMsg"></p>
+</div>
+
+<script>
+let debounceTimer;
+let bloodInventory = {};
+
+function updateStock() {
+    const bloodGroup = document.getElementById("update_blood_group").value;
+    const units = document.getElementById("update_units").value;
+    const msg = document.getElementById("updateMsg");
+
+    if (!bloodGroup || units === "") {
+        msg.innerText = "Please select a blood group and enter units.";
+        msg.style.color = '#c1121f';
+        return;
+    }
+
+    msg.innerHTML = "<span class='loading'></span>Updating stock...";
+    msg.style.color = '#1f7a3d';
+
+    fetch('/update-bloodbank-stock', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            blood_group: bloodGroup,
+            units: parseInt(units)
+        })
+    })
+    .then(response => response.json())
+    .then(data => {
+        if (data.success) {
+            msg.innerHTML = "✅ Stock updated successfully.";
+            msg.style.color = '#1f7a3d';
+        } else {
+            msg.innerText = data.message || "Failed to update stock.";
+            msg.style.color = '#c1121f';
+        }
+    })
+    .catch(error => {
+        console.error(error);
+        msg.innerText = "An error occurred.";
+        msg.style.color = '#c1121f';
+    });
+}
+
+// ---------- ADD BLOOD GROUP + UNITS ----------
+function addBloodGroupItem() {
+    const bloodGroup = document.getElementById("blood_group_select").value;
+    const units = document.getElementById("blood_units").value;
+    const msg = document.getElementById("msg");
+
+    msg.innerHTML = "";
+
+    if (!bloodGroup) {
+        msg.innerHTML = "Please select a blood group.";
+        return;
+    }
+
+    if (!units || parseInt(units) <= 0) {
+        msg.innerHTML = "Please enter valid units.";
+        return;
+    }
+
+    if (bloodInventory[bloodGroup]) {
+        msg.innerHTML = "This blood group is already added.";
+        return;
+    }
+
+    bloodInventory[bloodGroup] = parseInt(units);
+    renderBloodGroupList();
+
+    document.getElementById("blood_group_select").value = "";
+    document.getElementById("blood_units").value = "";
+}
+
+function renderBloodGroupList() {
+    const list = document.getElementById("bloodGroupList");
+    list.innerHTML = "";
+
+    const groups = Object.keys(bloodInventory);
+
+    if (groups.length === 0) return;
+
+    groups.forEach(group => {
+        const item = document.createElement("div");
+        item.className = "inventory-row";
+
+        item.innerHTML = `
+            <div class="inventory-col group">${group}</div>
+            <div class="inventory-col units">${bloodInventory[group]} units</div>
+            <div class="inventory-col delete" onclick="removeBloodGroupItem('${group}')">✖</div>
+        `;
+
+        list.appendChild(item);
+    });
+}
+
+function removeBloodGroupItem(group) {
+    delete bloodInventory[group];
+    renderBloodGroupList();
+}
+
+function prepareBloodBankData() {
+    const msg = document.getElementById("msg");
+
+    if (Object.keys(bloodInventory).length === 0) {
+        msg.innerHTML = "Please add at least one blood group with units.";
+        msg.style.color = '#c1121f';
+        return false;
+    }
+
+    msg.innerHTML = "<span class='loading'></span>Registering blood bank...";
+    msg.style.color = '#1f7a3d';
+
+    const formatted = Object.entries(bloodInventory)
+        .map(([group, units]) => `${group}:${units}`)
+        .join(",");
+
+    document.getElementById("blood_groups_available").value = formatted;
+    return true;
+}
+
+// ---------- LOCATION SUGGESTIONS ----------
+document.getElementById("location").addEventListener("input", function () {
+    const query = this.value.trim();
+    clearTimeout(debounceTimer);
+
+    if (query.length < 3) {
+        document.getElementById("suggestions").innerHTML = "";
+        return;
+    }
+
+    debounceTimer = setTimeout(() => {
+        fetchLocationSuggestions(query);
+    }, 400);
+});
+
+async function fetchLocationSuggestions(query) {
+    const suggestionsBox = document.getElementById("suggestions");
+
+    try {
+        const response = await fetch(
+            `https://nominatim.openstreetmap.org/search?format=jsonv2&q=${encodeURIComponent(query)}&limit=5`
+        );
+        const data = await response.json();
+
+        suggestionsBox.innerHTML = "";
+
+        if (!data.length) {
+            suggestionsBox.innerHTML = `<div class="suggestion-item">No matching locations found</div>`;
+            return;
+        }
+
+        data.forEach(place => {
+            const item = document.createElement("div");
+            item.className = "suggestion-item";
+            item.textContent = place.display_name;
+
+            item.onclick = function () {
+                document.getElementById("location").value = place.display_name;
+                document.getElementById("latitude").value = place.lat;
+                document.getElementById("longitude").value = place.lon;
+                suggestionsBox.innerHTML = "";
+                document.getElementById("msg").innerHTML = "Location selected.";
+            };
+
+            suggestionsBox.appendChild(item);
+        });
+
+    } catch (error) {
+        suggestionsBox.innerHTML = "";
+        console.log(error);
+    }
+}
+
+function useMyLocation() {
+    const msg = document.getElementById("msg");
+
+    if (!navigator.geolocation) {
+        msg.innerHTML = "Geolocation is not supported by your browser.";
+        return;
+    }
+
+    msg.innerHTML = "Fetching your current location...";
+
+    navigator.geolocation.getCurrentPosition(
+        async function(position) {
+            const lat = position.coords.latitude;
+            const lon = position.coords.longitude;
+
+            document.getElementById("latitude").value = lat;
+            document.getElementById("longitude").value = lon;
+
+            try {
+                const response = await fetch(
+                    `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`
+                );
+                const data = await response.json();
+
+                let place =
+                    data.address?.city ||
+                    data.address?.town ||
+                    data.address?.village ||
+                    data.address?.suburb ||
+                    data.display_name ||
+                    "Current Location";
+
+                document.getElementById("location").value = place;
+                document.getElementById("suggestions").innerHTML = "";
+                msg.innerHTML = "Current location detected successfully.";
+            } catch (error) {
+                document.getElementById("location").value = `${lat}, ${lon}`;
+                msg.innerHTML = "Coordinates captured, but place name not found.";
+            }
+        },
+        function() {
+            msg.innerHTML = "Unable to retrieve your location.";
+        }
+    );
+}
+
+document.addEventListener("click", function(e) {
+    if (e.target.id !== "location") {
+        document.getElementById("suggestions").innerHTML = "";
+    }
+});
+</script>
+
+</body>
+</html>

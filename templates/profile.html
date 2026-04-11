@@ -1,0 +1,816 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>BloodConnect — Profile</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <style>
+        .toggle-switch {
+            display: flex;
+            align-items: center;
+            gap: 14px;
+            margin: 16px 0;
+            flex-wrap: wrap;
+        }
+        .toggle-switch input[type="checkbox"] {
+            width: 46px;
+            height: 24px;
+            accent-color: #1f7a3d;
+        }
+        .toggle-switch .toggle-label {
+            font-size: 0.95rem;
+            color: #333;
+        }
+    </style>
+</head>
+
+<body class="has-bottom-nav">
+
+    <nav class="navbar">
+        <div class="menu">☰</div>
+        <div class="logo">BloodConnect</div>
+        <div class="nav-links">
+            <a href="/logout">Logout</a>
+        </div>
+    </nav>
+
+    <main class="profile-container">
+        <section class="profile-hero">
+            <h1>Welcome back, {{ user.name }}!</h1>
+            <p>Here are your recent blood activity updates.</p>
+        </section>
+
+        {% if user.role == 'donor' %}
+        <section class="profile-section">
+            <div class="section-header">
+                <h2>Donor Availability</h2>
+                <p>Turn this on to appear as an available donor to others. Turn it off to hide from donor search results.</p>
+            </div>
+            <div class="toggle-switch">
+                <input type="checkbox" id="donorToggle" {% if user.is_donor %}checked{% endif %}>
+                <span class="toggle-label" id="donorToggleLabel">{% if user.is_donor %}Visible as a donor{% else %}Hidden from donor search{% endif %}</span>
+            </div>
+        </section>
+
+        <section class="profile-section">
+            <div class="section-header">
+                <h2>Incoming Requests for You</h2>
+                <p>Accept or decline requests from patients matching your blood group.</p>
+            </div>
+            {% if notifications %}
+            <div class="card-grid">
+                {% for notification in notifications %}
+                <div class="notification-card">
+                    <div class="request-top">
+                        <h3>{{ notification[3] }} needs {{ notification[4] }}</h3>
+                        <span class="pill {{ notification[2] }}">{{ notification[2] | capitalize }}</span>
+                    </div>
+                    <p><strong>Hospital:</strong> {{ notification[5] }}</p>
+                    <p><strong>Location:</strong> {{ notification[6] }}</p>
+                    <p><strong>Units:</strong> {{ notification[7] }}</p>
+                    <p><strong>Contact:</strong> {{ notification[8] }}</p>
+                    <div class="notification-actions">
+                        {% if notification[2] == 'pending' %}
+                        <button class="action-btn accept-btn" data-id="{{ notification[0] }}">Accept</button>
+                        <button class="action-btn decline-btn" data-id="{{ notification[0] }}">Decline</button>
+                        {% elif notification[2] == 'accepted' %}
+                        <button class="action-btn cancel-btn" data-id="{{ notification[0] }}">Cancel</button>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-state">No incoming donor requests right now. When new requests arrive, they will appear
+                here.</div>
+            {% endif %}
+        </section>
+
+        <section class="profile-section">
+            <div class="section-header">
+                <h2>Emergency Requests</h2>
+                <p>Urgent blood requests with live tracking.</p>
+            </div>
+            {% if emergency_requests %}
+            <div class="card-grid">
+                {% for req in emergency_requests %}
+                <div class="request-card emergency-card request-card-link" data-request-id="{{ req.id }}" data-is-emergency="true">
+                    <div class="request-top">
+                        <h3>{{ req.patient_name }}</h3>
+                        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                            <span class="pill">{{ req.status }}</span>
+                            <span class="pill emergency">Emergency</span>
+                        </div>
+                    </div>
+                    <p><strong>Blood Group:</strong> {{ req.blood }}</p>
+                    <p><strong>Units needed:</strong> {{ req.units_required }}</p>
+                    <p><strong>Hospital:</strong> {{ req.hospital }}</p>
+                    <p><strong>Location:</strong> {{ req.location }}</p>
+                    {% if req.accepted_donors %}
+                    <div class="accepted-donors">
+                        <p><strong>Accepted Donor(s):</strong></p>
+                        {% for donor in req.accepted_donors %}
+                        <p>
+                            <input type="checkbox" class="actual-donor-checkbox" data-id="{{ donor.id }}"
+                                data-type="{{ donor.type }}">
+                            {{ donor.name }} — {{ donor.phone }}
+                        </p>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    <div style="margin-top: 15px; display: flex; gap: 10px;">
+                        <button type="button" class="primary-btn complete-btn" data-request-id="{{ req.id }}" style="flex: 1;">Mark
+                            as Completed</button>
+                        <button type="button" class="secondary-btn delete-request-btn"
+                            style="background-color: #ffebee; color: #c1121f; flex: 0.5;" data-request-id="{{ req.id }}">Delete</button>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-state">No emergency requests yet.</div>
+            {% endif %}
+        </section>
+
+        <section class="profile-section">
+            <div class="section-header">
+                <h2>Standard Blood Requests</h2>
+                <p>Regular blood requests.</p>
+            </div>
+            {% if standard_requests %}
+            <div class="card-grid">
+                {% for req in standard_requests %}
+                <div class="request-card request-card-link" data-request-id="{{ req.id }}" data-is-emergency="false">
+                    <div class="request-top">
+                        <h3>{{ req.patient_name }}</h3>
+                        <span class="pill">{{ req.status }}</span>
+                    </div>
+                    <p><strong>Blood Group:</strong> {{ req.blood }}</p>
+                    <p><strong>Units needed:</strong> {{ req.units_required }}</p>
+                    <p><strong>Hospital:</strong> {{ req.hospital }}</p>
+                    <p><strong>Location:</strong> {{ req.location }}</p>
+                    {% if req.accepted_donors %}
+                    <div class="accepted-donors">
+                        <p><strong>Accepted Responses:</strong></p>
+                        {% for donor in req.accepted_donors %}
+                        <p>
+                            <input type="checkbox" class="actual-donor-checkbox" data-id="{{ donor.id }}"
+                                data-type="{{ donor.type }}">
+                            {{ donor.name }} — {{ donor.phone }}
+                        </p>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                    <div style="margin-top: 15px; display: flex; gap: 10px;">
+                        <button type="button" class="primary-btn complete-btn" data-request-id="{{ req.id }}" style="flex: 1;">Mark
+                            as Completed</button>
+                        <button type="button" class="secondary-btn delete-request-btn"
+                            style="background-color: #ffebee; color: #c1121f; flex: 0.5;" data-request-id="{{ req.id }}">Delete</button>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-state">No standard requests yet. <a href="/request">Create one</a>.</div>
+            {% endif %}
+        </section>
+
+        <section class="profile-section">
+            <div class="section-header">
+                <h2>Completed Requests</h2>
+                <p>Requests you marked completed after accepting a donor.</p>
+            </div>
+            {% if completed_requests %}
+            <div class="card-grid">
+                {% for req in completed_requests %}
+                <div class="request-card completed-card request-card-link" data-request-id="{{ req.id }}" data-is-emergency="false">
+                    <div class="request-top">
+                        <h3>{{ req.patient_name }}</h3>
+                        <span class="pill completed">Completed</span>
+                    </div>
+                    <p><strong>Blood Group:</strong> {{ req.blood }}</p>
+                    <p><strong>Units needed:</strong> {{ req.units_required }}</p>
+                    <p><strong>Hospital:</strong> {{ req.hospital }}</p>
+                    <p><strong>Location:</strong> {{ req.location }}</p>
+                    <div class="accepted-donors">
+                        <p><strong>Donor(s):</strong></p>
+                        {% for donor in req.accepted_donors %}
+                        <p>{{ donor.name }} — {{ donor.phone }}</p>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-state">No completed requests yet. Complete a request after a donor accepts it.</div>
+            {% endif %}
+        </section>
+
+
+
+        <section class="profile-section">
+            <div class="section-header">
+                <h2>Donation History</h2>
+                <p>Review the donations you have accepted previously.</p>
+            </div>
+            {% if donations %}
+            <div class="card-grid">
+                {% for donation in donations %}
+                <div class="donation-card">
+                    <div class="request-top">
+                        <h3>{{ donation[2] }}</h3>
+                        <span class="pill completed">{{ donation[1] | capitalize }}</span>
+                    </div>
+                    <p><strong>Blood Group:</strong> {{ donation[3] }}</p>
+                    <p><strong>Hospital:</strong> {{ donation[4] }}</p>
+                    <p><strong>Location:</strong> {{ donation[5] }}</p>
+                    <p><strong>Units:</strong> {{ donation[6] }}</p>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            {% endif %}
+        </section>
+
+        <div style="text-align: center; margin: 20px 0;">
+            <button id="editProfileBtn" class="primary-btn" onclick="toggleEditProfile()"
+                style="width: auto; padding: 12px 24px;">Edit Profile</button>
+        </div>
+
+        <div id="editProfileSection" class="profile-section" style="display: none;">
+            <div class="section-header">
+                <h2>Edit Profile</h2>
+                <p>Update your personal information.</p>
+            </div>
+            <div class="edit-profile-card">
+                <form id="editProfileForm">
+                    <label>Name</label>
+                    <input type="text" id="edit_name" value="{{ user.name }}" required>
+
+                    <label>Email</label>
+                    <input type="email" id="edit_email" value="{{ user.email }}" required>
+
+                    <label>Phone</label>
+                    <input type="text" id="edit_phone" value="" placeholder="Enter phone" required>
+
+                    <label>Age</label>
+                    <input type="number" id="edit_age" placeholder="Enter age">
+
+                    <label>Weight (kg)</label>
+                    <input type="number" id="edit_weight" placeholder="Enter weight">
+
+                    <label>Blood Group</label>
+                    <select id="edit_blood">
+                        <option value="">Select Blood Group</option>
+                        <option value="A+">A+</option>
+                        <option value="A-">A-</option>
+                        <option value="B+">B+</option>
+                        <option value="B-">B-</option>
+                        <option value="O+">O+</option>
+                        <option value="O-">O-</option>
+                        <option value="AB+">AB+</option>
+                        <option value="AB-">AB-</option>
+                    </select>
+
+                    <label>Location</label>
+                    <input type="text" id="edit_location" placeholder="Enter location" style="width: 100%;">
+                    <div style="margin-top: 12px; text-align: center;">
+                        <button type="button" onclick="useCurrentLocation()" class="secondary-btn"
+                            style="width: auto; padding: 12px 20px; white-space: nowrap;">Use Current Location</button>
+                    </div>
+
+                    <div style="margin-top: 20px; text-align: center;">
+                        <button type="button" onclick="updateProfile()" class="primary-btn submit-btn">Update
+                            Profile</button>
+                    </div>
+                </form>
+                <p id="editMsg"></p>
+            </div>
+        </div>
+
+        {% elif user.role == 'bank' %}
+        <section class="profile-section">
+            <div class="section-header">
+                <h2>Incoming Blood Requests</h2>
+                <p>Hospitals and patients explicitly requesting blood from you.</p>
+            </div>
+            {% if bank_requests %}
+            <div class="card-grid">
+                {% for req in bank_requests %}
+                <div class="request-card {% if req.bank_status == 'accepted' %}completed-card{% endif %}">
+                    <h3>{{ req.patient_name }}</h3>
+                    <p><strong>Blood Group:</strong> {{ req.blood }} ({{ req.units_required }} units)</p>
+                    <p><strong>Status:</strong> <span class="pill sprint">{{ req.bank_status | capitalize }}</span></p>
+
+                    {% if req.bank_status == 'pending' %}
+                    <div style="margin-top:10px; display:flex; gap:10px;">
+                        <button class="primary-btn bank-action-btn" data-request-id="{{ req.0 }}" data-action="accept"
+                            style="flex:1">Accept</button>
+                        <button class="secondary-btn bank-action-btn" data-request-id="{{ req.0 }}" data-action="decline"
+                            style="flex:1; background-color:#ffebee; color:#c1121f; border-color:#c1121f;">Decline</button>
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-state">No blood requests targeted to your bank yet.</div>
+            {% endif %}
+        </section>
+
+        <section class="profile-section">
+            <div class="section-header">
+                <h2>My Donation Drives</h2>
+                <p>Organize campaigns to restock your inventory.</p>
+                <div style="text-align: right; margin-top:-30px;">
+                    <button class="primary-btn" onclick="toggleDriveModal()" style="width:auto; padding:8px 16px;">+
+                        Plan a Drive</button>
+                </div>
+            </div>
+            {% if bank_drives %}
+            <div class="card-grid">
+                {% for drive in bank_drives %}
+                <div class="request-card {% if drive.status == 'completed' %}completed-card{% endif %}">
+                    <h3>{{ drive.title }} <span class="pill" style="float:right">{{ drive.status }}</span></h3>
+                    <p><strong>Date:</strong> {{ drive.date }}</p>
+                    {% if drive.status == 'open' %}
+                    {% if drive.registrations %}
+                    <p><strong>Registered Donors:</strong></p>
+                    <div class="accepted-donors">
+                        {% for r in drive.registrations %}
+                        <label style="display:block; margin-bottom:10px;">
+                            <input type="checkbox" class="drive-donor-checkbox-{{ drive.id }}" value="{{ r[0] }}">
+                            {{ r[1] }} ({{ r[3] }}) - {{ r[2] }}
+                        </label>
+                        {% endfor %}
+                    </div>
+                    <button class="primary-btn complete-drive-btn" style="margin-top:10px; width:100%" data-drive-id="{{ drive.id }}">Mark Donated & Finish Drive</button>
+                    {% else %}
+                    <p style="color:#888;">No registrations yet.</p>
+                    {% endif %}
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-state">You haven't arranged any donation drives.</div>
+            {% endif %}
+        </section>
+
+        <div style="text-align: center; margin: 20px 0;">
+            <button class="primary-btn" onclick="toggleBankEdit()" style="width: auto; padding: 12px 24px;">Edit Bank
+                Settings & Stock</button>
+        </div>
+
+        <div id="editBankSection" class="profile-section" style="display:none;">
+            <div class="edit-profile-card">
+                <h2>Update Inventory</h2>
+                <p style="margin-bottom:10px; color:#666;">Update your immediate blood stock here so users can find you.
+                </p>
+                <form id="updateStockForm">
+                    <label>Blood Group</label>
+                    <select id="update_blood_group">
+                        <option value="">Select Blood Group</option>
+                        <option value="A+">A+</option>
+                        <option value="A-">A-</option>
+                        <option value="B+">B+</option>
+                        <option value="B-">B-</option>
+                        <option value="O+">O+</option>
+                        <option value="O-">O-</option>
+                        <option value="AB+">AB+</option>
+                        <option value="AB-">AB-</option>
+                    </select>
+
+                    <label>Units Available</label>
+                    <input type="number" id="update_units" min="0">
+
+                    <button type="button" onclick="updateStock()" class="primary-btn"
+                        style="margin-top:15px; width:100%;">Update Stock</button>
+                    <p id="updateMsg"></p>
+                </form>
+
+                <hr style="margin:30px 0; border:1px solid #eee;">
+
+                <h2>Edit Bank Settings</h2>
+                <label>Bank Name</label>
+                <input type="text" id="edit_bank_name" value="{{ user.name }}" disabled>
+                <label>Contact Email</label>
+                <input type="text" id="edit_bank_email" value="{{ user.email }}" disabled>
+                <p style="color:#666; font-size:0.9em; margin-bottom:10px;">Contact admin to change locked settings.</p>
+                <div style="margin-top: 12px;">
+                    <button type="button" onclick="alert('Profile Settings Sent.')" class="primary-btn"
+                        style="width: 100%;">Save Base Profile</button>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+    </main>
+
+    <!-- Modal for Drive -->
+    <div id="driveModal" class="modal">
+        <div class="modal-content" style="max-width: 500px;">
+            <span class="close" onclick="closeDriveModal()">&times;</span>
+            <h2>Plan Donation Drive</h2>
+            <label>Campaign Title</label>
+            <input type="text" id="drive_title" style="width:100%">
+            <label>Date of Event</label>
+            <input type="date" id="drive_date" style="width:100%">
+            <label>Registration Deadline</label>
+            <input type="date" id="drive_deadline" style="width:100%">
+            <label>Location</label>
+            <input type="text" id="drive_location" style="width:100%" placeholder="Hospital or event grounds">
+            <label>Description</label>
+            <textarea id="drive_desc"
+                style="width:100%; padding:10px; border-radius:4px; border:1px solid #ddd;"></textarea>
+            <button class="primary-btn" onclick="submitDrive()" style="margin-top:20px; width:100%;">Organize
+                Drive</button>
+        </div>
+    </div>
+
+    <div id="requestModal" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="closeModal()">&times;</span>
+            <h2 id="modalTitle">Request Details</h2>
+            <div id="modalMap" class="modal-map"></div>
+            <div id="modalDonors"></div>
+        </div>
+    </div>
+
+    <footer class="bottom-nav">
+        <a href="/" class="nav-item">
+            <i class="fa-solid fa-house"></i>
+            <span>Home</span>
+        </a>
+        <a href="/profile" class="nav-item active">
+            <i class="fa-solid fa-user"></i>
+            <span>Profile</span>
+        </a>
+    </footer>
+
+    <script>
+        document.querySelectorAll('.accept-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const id = btn.dataset.id;
+                await fetch('/notification-action', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id, action: 'accept' })
+                });
+                location.reload();
+            });
+        });
+
+        document.querySelectorAll('.decline-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const id = btn.dataset.id;
+                await fetch('/notification-action', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id, action: 'decline' })
+                });
+                location.reload();
+            });
+        });
+
+        document.querySelectorAll('.cancel-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const id = btn.dataset.id;
+                await fetch('/notification-action', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id, action: 'cancel' })
+                });
+                location.reload();
+            });
+        });
+
+        document.querySelectorAll('.request-card-link').forEach(card => {
+            card.addEventListener('click', () => {
+                const requestId = card.dataset.requestId;
+                const isEmergency = card.dataset.isEmergency === 'true';
+                showRequestDetails(requestId, isEmergency);
+            });
+        });
+
+        document.querySelectorAll('.complete-btn').forEach(btn => {
+            btn.addEventListener('click', async event => {
+                event.stopPropagation();
+                const requestId = btn.dataset.requestId;
+                if (!requestId) return;
+                await completeRequest(btn, requestId);
+            });
+        });
+
+        document.querySelectorAll('.delete-request-btn').forEach(btn => {
+            btn.addEventListener('click', async event => {
+                event.stopPropagation();
+                const requestId = btn.dataset.requestId;
+                if (!requestId) return;
+                await deleteOwnRequest(requestId);
+            });
+        });
+
+        document.querySelectorAll('.bank-action-btn').forEach(btn => {
+            btn.addEventListener('click', async () => {
+                const requestId = btn.dataset.requestId;
+                const action = btn.dataset.action;
+                if (!requestId || !action) return;
+                await fetch('/bank-action', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ request_id: requestId, action })
+                });
+                location.reload();
+            });
+        });
+
+        document.querySelectorAll('.complete-drive-btn').forEach(btn => {
+            btn.addEventListener('click', async event => {
+                event.stopPropagation();
+                const driveId = btn.dataset.driveId;
+                if (!driveId) return;
+                completeDrive(driveId);
+            });
+        });
+
+        async function completeRequest(btnElement, requestId) {
+            const card = btnElement.closest('.request-card');
+            const checkboxes = card.querySelectorAll('.actual-donor-checkbox:checked');
+            const actualDonors = [];
+            const actualBanks = [];
+
+            checkboxes.forEach(cb => {
+                if (cb.dataset.type === 'donor') actualDonors.push(cb.dataset.id);
+                if (cb.dataset.type === 'bank') actualBanks.push(cb.dataset.id);
+            });
+
+            const res = await fetch('/complete-request', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    request_id: requestId,
+                    actual_donors: actualDonors,
+                    actual_banks: actualBanks
+                })
+            });
+            const data = await res.json();
+            if (data.success) {
+                location.reload();
+            } else {
+                alert(data.message || 'Unable to complete request.');
+            }
+        }
+
+        async function deleteOwnRequest(requestId) {
+            if (!confirm('Are you sure you want to delete this request? This action cannot be undone.')) return;
+            const res = await fetch('/delete-request', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ request_id: requestId })
+            });
+            const data = await res.json();
+            if (data.success) {
+                location.reload();
+            } else {
+                alert(data.message || 'Unable to delete request.');
+            }
+        }
+
+        const donorToggle = document.getElementById('donorToggle');
+        if (donorToggle) {
+            const donorToggleLabel = document.getElementById('donorToggleLabel');
+            donorToggle.addEventListener('change', async () => {
+                const action = donorToggle.checked ? 'show' : 'hide';
+                donorToggleLabel.innerText = donorToggle.checked ? 'Visible as a donor' : 'Hidden from donor search';
+
+                const response = await fetch('/update-donor-status', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action })
+                });
+                if (response.ok) {
+                    location.reload();
+                } else {
+                    donorToggle.checked = !donorToggle.checked;
+                    donorToggleLabel.innerText = donorToggle.checked ? 'Visible as a donor' : 'Hidden from donor search';
+                    alert('Could not update donor visibility.');
+                }
+            });
+        }
+
+        // Load user data for edit
+        fetch('/get-user-data')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    document.getElementById('edit_phone').value = data.user.phone || '';
+                    document.getElementById('edit_age').value = data.user.age || '';
+                    document.getElementById('edit_weight').value = data.user.weight || '';
+                    document.getElementById('edit_blood').value = data.user.blood || '';
+                    document.getElementById('edit_location').value = data.user.location || '';
+                }
+            });
+
+        function toggleEditProfile() {
+            const section = document.getElementById('editProfileSection');
+            const btn = document.getElementById('editProfileBtn');
+            if (section.style.display === 'none') {
+                section.style.display = 'block';
+                btn.textContent = 'Hide Edit Profile';
+            } else {
+                section.style.display = 'none';
+                btn.textContent = 'Edit Profile';
+            }
+        }
+
+        function useCurrentLocation() {
+            const locationInput = document.getElementById('edit_location');
+            const msg = document.getElementById('editMsg');
+
+            if (!navigator.geolocation) {
+                msg.innerText = 'Geolocation is not supported by your browser.';
+                alert("Geolocation is not supported by your browser.");
+                return;
+            }
+
+            navigator.geolocation.getCurrentPosition(
+                async function (position) {
+                    const lat = position.coords.latitude;
+                    const lon = position.coords.longitude;
+
+                    try {
+                        const response = await fetch(`https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lon}`);
+                        const data = await response.json();
+                        let place = data.address?.city || data.address?.town || data.address?.village || data.display_name || "Current Location";
+                        document.getElementById("edit_location").value = place;
+                        alert("Location updated based on GPS.");
+                    } catch (error) {
+                        document.getElementById("edit_location").value = `${lat}, ${lon}`;
+                        alert("Coordinates extracted, but place name not found.");
+                    }
+                },
+                function () {
+                    alert("Unable to retrieve your location.");
+                }
+            );
+        }
+
+        // ---------- BANK FUNCTIONS ----------
+        function toggleBankEdit() {
+            const sec = document.getElementById('editBankSection');
+            sec.style.display = sec.style.display === 'none' ? 'block' : 'none';
+            if (sec.style.display === 'block') sec.scrollIntoView({ behavior: 'smooth' });
+        }
+        function updateStock() {
+            const group = document.getElementById("update_blood_group").value;
+            const units = document.getElementById("update_units").value;
+            if (!group || units === "") { alert("Please select a blood group and enter units."); return; }
+            fetch('/update-bloodbank-stock', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ blood_group: group, units: parseInt(units) }) })
+                .then(r => r.json()).then(d => { if (d.success) { document.getElementById("updateMsg").innerText = "Stock Updated."; } });
+        }
+        function bankAction(reqId, action) {
+            fetch('/bank-action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ request_id: reqId, action: action }) })
+                .then(r => r.json()).then(d => { if (d.success) location.reload() });
+        }
+        function toggleDriveModal() { document.getElementById('driveModal').style.display = 'block'; }
+        function closeDriveModal() { document.getElementById('driveModal').style.display = 'none'; }
+        function submitDrive() {
+            let title = document.getElementById('drive_title').value;
+            let date = document.getElementById('drive_date').value;
+            let deadline = document.getElementById('drive_deadline').value;
+            let location = document.getElementById('drive_location').value;
+            let desc = document.getElementById('drive_desc').value;
+            fetch('/create-drive', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, date, deadline, location, description: desc }) })
+                .then(r => r.json()).then(d => { if (d.success) window.location.reload() });
+        }
+        function completeDrive(driveId) {
+            let selected = [];
+            document.querySelectorAll(`.drive-donor-checkbox-${driveId}:checked`).forEach(cb => selected.push(cb.value));
+            fetch('/complete-drive', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ drive_id: driveId, actual_donors: selected }) })
+                .then(r => r.json()).then(d => { if (d.success) window.location.reload() });
+        }
+
+        function updateProfile() {
+            const msg = document.getElementById('editMsg');
+            const name = document.getElementById('edit_name').value.trim();
+            const email = document.getElementById('edit_email').value.trim();
+            const phone = document.getElementById('edit_phone').value.trim();
+            const age = document.getElementById('edit_age').value;
+            const weight = document.getElementById('edit_weight').value;
+            const blood = document.getElementById('edit_blood').value;
+            const location = document.getElementById('edit_location').value.trim();
+
+            msg.innerHTML = '<span class="loading"></span>Updating profile...';
+            msg.style.color = '#1f7a3d';
+
+            fetch('/update-profile', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name, email, phone, age, weight, blood, location })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    msg.innerText = data.message;
+                    msg.style.color = data.success ? '#1f7a3d' : '#c1121f';
+                    if (data.success) {
+                        setTimeout(() => location.reload(), 1200);
+                    }
+                })
+                .catch(error => {
+                    msg.innerText = 'Unable to update profile. Please try again.';
+                    msg.style.color = '#c1121f';
+                    console.error(error);
+                });
+        }
+
+        let modalMap = null;
+
+        function showRequestDetails(requestId, isEmergency) {
+            fetch(`/request-details?request_id=${requestId}`)
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        document.getElementById('modalTitle').innerText = `${data.request.patient_name} - ${data.request.blood}`;
+                        document.getElementById('modalDonors').innerHTML = '<h3>Accepted Donors:</h3>';
+                        if (data.donors.length > 0) {
+                            data.donors.forEach(donor => {
+                                document.getElementById('modalDonors').innerHTML += `
+                            <div class="donor-info">
+                                <strong>${donor.name}</strong> (${donor.blood}) - <a href="tel:${donor.phone}">${donor.phone}</a> - ${donor.location}
+                            </div>
+                        `;
+                            });
+                            if (isEmergency) {
+                                initModalMap(data.request, data.donors);
+                            } else {
+                                document.getElementById('modalMap').style.display = 'none';
+                            }
+                        } else {
+                            document.getElementById('modalDonors').innerHTML += '<p>No accepted donors yet.</p>';
+                            document.getElementById('modalMap').style.display = 'none';
+                        }
+                        document.getElementById('requestModal').style.display = 'block';
+                    }
+                });
+        }
+
+        function initModalMap(request, donors) {
+            document.getElementById('modalMap').style.display = 'block';
+            if (!modalMap) {
+                modalMap = L.map('modalMap').setView([request.latitude || 17.3850, request.longitude || 78.4867], 12);
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    attribution: '© OpenStreetMap contributors'
+                }).addTo(modalMap);
+            } else {
+                modalMap.setView([request.latitude || 17.3850, request.longitude || 78.4867], 12);
+                modalMap.invalidateSize();
+            }
+
+            modalMap.eachLayer(layer => {
+                if (layer instanceof L.Marker) {
+                    modalMap.removeLayer(layer);
+                }
+            });
+
+            if (request.latitude && request.longitude) {
+                L.marker([request.latitude, request.longitude]).addTo(modalMap)
+                    .bindPopup(`Hospital: ${request.hospital}`);
+            }
+
+            donors.forEach(donor => {
+                if (donor.latitude && donor.longitude) {
+                    L.marker([donor.latitude, donor.longitude]).addTo(modalMap)
+                        .bindPopup(`${donor.name} (${donor.blood})`);
+                }
+            });
+
+            if (donors.length > 0 && request.latitude && request.longitude) {
+                const bounds = L.latLngBounds([
+                    [request.latitude, request.longitude],
+                    ...donors.map(d => [d.latitude, d.longitude]).filter(coord => coord[0] && coord[1])
+                ]).pad(0.4);
+                modalMap.fitBounds(bounds);
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('requestModal').style.display = 'none';
+        }
+
+        // Flicker emergency cards on load
+        document.addEventListener('DOMContentLoaded', () => {
+            const emergencyCards = document.querySelectorAll('.emergency-card');
+            emergencyCards.forEach(card => {
+                card.classList.add('emergency-flicker');
+                setTimeout(() => {
+                    card.classList.remove('emergency-flicker');
+                }, 1000);
+            });
+        });
+    </script>
+
+</body>
+
+</html>

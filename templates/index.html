@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>BloodConnect — Donate Blood, Save Lives</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+
+<body {% if user %}class="has-bottom-nav" {% endif %}>
+
+    <nav class="navbar">
+        <div class="menu">☰</div>
+        <div class="logo">BloodConnect</div>
+        <div class="nav-links">
+            {% if user %}
+            <a href="/logout">Logout</a>
+            {% else %}
+            <a href="/signup">Sign up</a>
+            <a href="/login">Sign in</a>
+            <a href="/bloodbank">Blood Banks</a>
+            {% endif %}
+        </div>
+    </nav>
+
+    <section class="hero-section">
+        <div class="hero-left">
+            <span class="hero-badge">🩸 Smart Blood Donation &amp; Emergency Matching</span>
+            <h1>Donate Blood,<br><span>Save Lives</span></h1>
+            <p class="hero-text">
+                BloodConnect connects donors, patients, and blood banks instantly.
+                Register, find compatible donors nearby, and respond in urgent situations — all in one place.
+            </p>
+            <div class="hero-actions">
+                <a href="{{ '/profile' if user else '/login?next=/profile' }}" class="hero-btn primary-btn">Become a
+                    Donor</a>
+                <a href="{{ '/request' if user else '/login?next=/request' }}" class="hero-btn secondary-btn">Find
+                    Donors</a>
+            </div>
+        </div>
+        <div class="hero-right">
+            <img src="{{ url_for('static', filename='images/blood-hero.png') }}" alt="Blood donation illustration">
+        </div>
+    </section>
+
+    <section class="quick-actions">
+        <div class="action-card" onclick="location.href='{{ '/profile' if user else '/login?next=/profile' }}'">
+            <div class="icon-circle"><i class="fa-solid fa-droplet"></i></div>
+            <h3>Donate Blood</h3>
+            <p>Register as a donor and help save lives in your area today.</p>
+        </div>
+        <div class="action-card" onclick="location.href='{{ '/request' if user else '/login?next=/request' }}'">
+            <div class="icon-circle"><i class="fa-solid fa-magnifying-glass"></i></div>
+            <h3>Find Donors</h3>
+            <p>Search compatible donors by blood group and location instantly.</p>
+        </div>
+        <div class="action-card" onclick="location.href='{{ '/bloodbank' if user else '/login?next=/bloodbank' }}'">
+            <div class="icon-circle"><i class="fa-solid fa-hospital"></i></div>
+            <h3>Blood Banks</h3>
+            <p>Register and discover nearby blood banks with available inventory.</p>
+        </div>
+        <div class="action-card" onclick="location.href='{{ '/emergency' if user else '/login?next=/emergency' }}'">
+            <div class="icon-circle"><i class="fa-solid fa-triangle-exclamation"></i></div>
+            <h3>Emergency</h3>
+            <p>Locate nearby donors instantly on the map during urgent situations.</p>
+        </div>
+    </section>
+
+    <section class="stats-section">
+        <div class="stat-box">
+            <h2>1,200+</h2>
+            <p>Registered Donors</p>
+        </div>
+        <div class="stat-box">
+            <h2>350+</h2>
+            <p>Blood Requests</p>
+        </div>
+        <div class="stat-box">
+            <h2>90+</h2>
+            <p>Emergency Matches</p>
+        </div>
+        <div class="stat-box">
+            <h2>25+</h2>
+            <p>Active Locations</p>
+        </div>
+    </section>
+
+    <section class="how-it-works">
+        <h2>How <span>BloodConnect</span> Works</h2>
+        <div class="steps">
+            <div class="step-card">
+                <span class="step-number">01 — Register</span>
+                <h3>Sign Up as a Donor</h3>
+                <p>Donors sign up with blood group, contact details, and live location in under two minutes.</p>
+            </div>
+            <div class="step-card">
+                <span class="step-number">02 — Search</span>
+                <h3>Find Compatible Donors</h3>
+                <p>Patients search by blood group and compatibility — results are sorted from nearest to farthest.</p>
+            </div>
+            <div class="step-card">
+                <span class="step-number">03 — Respond</span>
+                <h3>Act Fast in Emergencies</h3>
+                <p>Emergency mode finds eligible donors on a live map, letting you call them directly within seconds.
+                </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Upcoming Donation Drives -->
+    <section style="margin: 40px auto; max-width: 1200px; padding: 0 20px;">
+        <h2>Upcoming <span>Donation Drives</span></h2>
+        {% if drives %}
+        <div
+            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-top: 20px;">
+            {% for drive in drives %}
+            <div class="card" style="margin: 0;">
+                <h3 style="color: #c1121f; margin-top: 0;">{{ drive.title }}</h3>
+                <p><strong>Blood Bank:</strong> {{ drive.bank_name }}</p>
+                <p><strong>Date:</strong> {{ drive.date }} (Deadline: {{ drive.deadline }})</p>
+                <p><strong>Location:</strong> {{ drive.location }}</p>
+                <p style="color: #666; font-size: 0.9em; margin-bottom: 20px;">{{ drive.description }}</p>
+
+                {% if user and user.get('role') == 'donor' %}
+                {% if drive.is_registered %}
+                <button class="secondary-btn" style="width: 100%; border-color: #c1121f; color: #c1121f;"
+                    onclick="cancelDrive({{ drive.id }})">Cancel Registration</button>
+                {% else %}
+                <button class="primary-btn" style="width: 100%;" onclick="registerDrive({{ drive.id }})">Register for
+                    Drive</button>
+                {% endif %}
+                {% elif user and user.get('role') == 'bank' %}
+                <!-- Banks manage their drives in their profile -->
+                {% else %}
+                <button class="primary-btn" style="width: 100%;" onclick="location.href='/login'">Log in to
+                    Register</button>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p style="color: #666;">There are no upcoming donation drives scheduled at this time.</p>
+        {% endif %}
+    </section>
+
+    <script>
+        function registerDrive(driveId) {
+            fetch('/register-drive', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ drive_id: driveId })
+            }).then(r => r.json()).then(d => {
+                if (d.success) location.reload();
+                else alert('Failed to register.');
+            });
+        }
+        function cancelDrive(driveId) {
+            fetch('/cancel-drive', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ drive_id: driveId })
+            }).then(r => r.json()).then(d => {
+                if (d.success) location.reload();
+                else alert('Failed to cancel registration.');
+            });
+        }
+    </script>
+
+    {% if user %}
+    <footer class="bottom-nav">
+        <a href="/" class="nav-item">
+            <i class="fa-solid fa-house"></i>
+            <span>Home</span>
+        </a>
+        <a href="/profile" class="nav-item">
+            <i class="fa-solid fa-user"></i>
+            <span>Profile</span>
+        </a>
+    </footer>
+    {% endif %}
+
+</body>
+
+</html>

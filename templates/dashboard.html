@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>BloodConnect - Dashboard</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+</head>
+<body>
+
+<!-- Navbar -->
+<div class="navbar">
+    <div class="logo">BloodConnect</div>
+    <div class="nav-links">
+        <a href="/home">Home</a>
+        <a href="/profile">Profile</a>
+        <a href="/logout">Logout</a>
+    </div>
+</div>
+
+<!-- Welcome + Donor Toggle -->
+<section class="dashboard-header">
+    <h2>Welcome, {% if user %}{{ user.name }}{% else %}Admin{% endif %}!</h2>
+    <div class="donor-toggle">
+        <span>Donor Status:</span>
+        <label class="switch">
+            <input type="checkbox" id="donorStatus" {% if user and user.is_donor %}checked{% endif %}>
+            <span class="slider round"></span>
+        </label>
+    </div>
+</section>
+
+<!-- Profile Summary -->
+<section class="profile-summary">
+    <div class="summary-card">
+        <h3>Donations Made</h3>
+        <p>{{ donations_count }}</p>
+    </div>
+    <div class="summary-card">
+        <h3>Pending Requests</h3>
+        <p>{{ pending_requests_count }}</p>
+    </div>
+    <div class="summary-card">
+        <h3>Requests Submitted</h3>
+        <p>{{ requests_submitted_count }}</p>
+    </div>
+</section>
+
+<section class="admin-actions">
+    <button onclick="location.href='/seed-test-data'">Seed Test Data</button>
+    <button onclick="location.href='/clear-test-data'">Clear Test Data</button>
+</section>
+
+<!-- Notifications Popup -->
+<div id="notifications">
+    {% for notification in notifications %}
+    <div class="notification-card">
+        <p>Blood request from {{ notification.requester_name }} for {{ notification.blood_group }} blood.</p>
+        <button class="accept-btn" data-id="{{ notification.id }}">Accept</button>
+        <button class="decline-btn" data-id="{{ notification.id }}">Decline</button>
+    </div>
+    {% endfor %}
+</div>
+
+<!-- Quick Actions / App Interface -->
+<section class="quick-actions">
+    <div class="action-card" onclick="location.href='/request'">
+        <div class="icon-circle"><i class="fa-solid fa-hand-holding-heart"></i></div>
+        <h3>Request Blood</h3>
+        <p>Submit a new blood request and find compatible donors.</p>
+    </div>
+
+    <div class="action-card" onclick="location.href='/find-donors'">
+        <div class="icon-circle"><i class="fa-solid fa-magnifying-glass"></i></div>
+        <h3>Find Donors</h3>
+        <p>Search and send requests to compatible donors nearby.</p>
+    </div>
+
+    <div class="action-card" onclick="location.href='/bloodbank'">
+        <div class="icon-circle"><i class="fa-solid fa-hospital"></i></div>
+        <h3>Blood Banks</h3>
+        <p>View and register blood banks for faster access.</p>
+    </div>
+
+    <div class="action-card emergency-card" onclick="location.href='/emergency'">
+        <div class="icon-circle"><i class="fa-solid fa-triangle-exclamation"></i></div>
+        <h3>Emergency Case</h3>
+        <p>Locate nearby donors instantly in urgent situations.</p>
+    </div>
+</section>
+
+<!-- Stats Section -->
+<section class="stats-section">
+    <div class="stat-box">
+        <h2>{{ total_donors }}</h2>
+        <p>Registered Donors</p>
+    </div>
+    <div class="stat-box">
+        <h2>{{ total_requests }}</h2>
+        <p>Blood Requests</p>
+    </div>
+    <div class="stat-box">
+        <h2>{{ emergency_matches }}</h2>
+        <p>Emergency Matches</p>
+    </div>
+    <div class="stat-box">
+        <h2>{{ active_locations }}</h2>
+        <p>Active Locations</p>
+    </div>
+</section>
+
+<script>
+    // Handle donor toggle
+    $('#donorStatus').change(function() {
+        let status = $(this).is(':checked') ? 'on' : 'off';
+        $.post('/update-donor-status', {status: status});
+    });
+
+    // Handle notifications accept/decline
+    $('.accept-btn').click(function() {
+        let id = $(this).data('id');
+        $.post('/notification-action', {id: id, action: 'accept'}, function() {
+            location.reload();
+        });
+    });
+
+    $('.decline-btn').click(function() {
+        let id = $(this).data('id');
+        $.post('/notification-action', {id: id, action: 'decline'}, function() {
+            location.reload();
+        });
+    });
+</script>
+
+</body>
+</html>
