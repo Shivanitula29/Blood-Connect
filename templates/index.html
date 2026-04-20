@@ -65,6 +65,41 @@
             <h3>Emergency</h3>
             <p>Locate nearby donors instantly on the map during urgent situations.</p>
         </div>
+        <div class="action-card" onclick="location.href='{{ '/drives' if user else '/login?next=/drives' }}'">
+            <div class="icon-circle"><i class="fa-solid fa-calendar"></i></div>
+            <h3>Join Drives</h3>
+            <p>Participate in organized blood donation drives at various locations.</p>
+        </div>
+        <div class="action-card" onclick="location.href='{{ '/profile' if user else '/login?next=/profile' }}'">
+            <div class="icon-circle"><i class="fa-solid fa-check-circle"></i></div>
+            <h3>Check Eligibility</h3>
+            <p>Verify if you are eligible to donate blood.</p>
+        </div>
+        <div class="action-card" onclick="location.href='{{ '/profile' if user else '/login?next=/profile' }}'">
+            <div class="icon-circle"><i class="fa-solid fa-trophy"></i></div>
+            <h3>View Achievements</h3>
+            <p>Check your donation milestones and badges.</p>
+        </div>
+        <div class="action-card" onclick="location.href='{{ '/profile' if user else '/login?next=/profile' }}'">
+            <div class="icon-circle"><i class="fa-solid fa-user"></i></div>
+            <h3>My Dashboard</h3>
+            <p>View your donation history and manage your profile.</p>
+        </div>
+        <div class="action-card" onclick="location.href='{{ '/profile' if user else '/login?next=/profile' }}'">
+            <div class="icon-circle"><i class="fa-solid fa-calendar-alt"></i></div>
+            <h3>Schedule Appointment</h3>
+            <p>Book a donation appointment at your convenience.</p>
+        </div>
+        <div class="action-card" onclick="location.href='{{ '/education' if user else '/login?next=/education' }}'">
+            <div class="icon-circle"><i class="fa-solid fa-book"></i></div>
+            <h3>Education Hub</h3>
+            <p>Learn about blood donation myths, benefits, and eligibility.</p>
+        </div>
+        <div class="action-card" onclick="location.href='{{ '/stories' if user else '/login?next=/stories' }}'">
+            <div class="icon-circle"><i class="fa-solid fa-heart"></i></div>
+            <h3>Community Stories</h3>
+            <p>Read and share inspiring donation stories.</p>
+        </div>
     </section>
 
     <section class="stats-section">
@@ -107,65 +142,6 @@
             </div>
         </div>
     </section>
-
-    <!-- Upcoming Donation Drives -->
-    <section style="margin: 40px auto; max-width: 1200px; padding: 0 20px;">
-        <h2>Upcoming <span>Donation Drives</span></h2>
-        {% if drives %}
-        <div
-            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-top: 20px;">
-            {% for drive in drives %}
-            <div class="card" style="margin: 0;">
-                <h3 style="color: #c1121f; margin-top: 0;">{{ drive.title }}</h3>
-                <p><strong>Blood Bank:</strong> {{ drive.bank_name }}</p>
-                <p><strong>Date:</strong> {{ drive.date }} (Deadline: {{ drive.deadline }})</p>
-                <p><strong>Location:</strong> {{ drive.location }}</p>
-                <p style="color: #666; font-size: 0.9em; margin-bottom: 20px;">{{ drive.description }}</p>
-
-                {% if user and user.get('role') == 'donor' %}
-                {% if drive.is_registered %}
-                <button class="secondary-btn" style="width: 100%; border-color: #c1121f; color: #c1121f;"
-                    onclick="cancelDrive({{ drive.id }})">Cancel Registration</button>
-                {% else %}
-                <button class="primary-btn" style="width: 100%;" onclick="registerDrive({{ drive.id }})">Register for
-                    Drive</button>
-                {% endif %}
-                {% elif user and user.get('role') == 'bank' %}
-                <!-- Banks manage their drives in their profile -->
-                {% else %}
-                <button class="primary-btn" style="width: 100%;" onclick="location.href='/login'">Log in to
-                    Register</button>
-                {% endif %}
-            </div>
-            {% endfor %}
-        </div>
-        {% else %}
-        <p style="color: #666;">There are no upcoming donation drives scheduled at this time.</p>
-        {% endif %}
-    </section>
-
-    <script>
-        function registerDrive(driveId) {
-            fetch('/register-drive', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ drive_id: driveId })
-            }).then(r => r.json()).then(d => {
-                if (d.success) location.reload();
-                else alert('Failed to register.');
-            });
-        }
-        function cancelDrive(driveId) {
-            fetch('/cancel-drive', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ drive_id: driveId })
-            }).then(r => r.json()).then(d => {
-                if (d.success) location.reload();
-                else alert('Failed to cancel registration.');
-            });
-        }
-    </script>
 
     {% if user %}
     <footer class="bottom-nav">

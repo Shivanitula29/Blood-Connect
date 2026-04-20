@@ -23,7 +23,10 @@ def create_db():
         longitude REAL,
         last_donated TEXT,
         is_donor INTEGER DEFAULT 0,
-        is_available INTEGER DEFAULT 1
+        is_available INTEGER DEFAULT 1,
+        referral_code TEXT,
+        role TEXT DEFAULT 'donor',
+        is_admin INTEGER DEFAULT 0
     )
     ''')
 
@@ -114,6 +117,38 @@ def create_db():
     )
     ''')
 
+    # Referrals table
+    cur.execute('''
+    CREATE TABLE IF NOT EXISTS referrals(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        referrer_id INTEGER,
+        referred_id INTEGER,
+        date TEXT
+    )
+    ''')
+
+    # Stories table
+    cur.execute('''
+    CREATE TABLE IF NOT EXISTS stories(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        content TEXT,
+        image_url TEXT,
+        date TEXT,
+        privacy TEXT DEFAULT 'public'
+    )
+    ''')
+
+    # Badges table
+    cur.execute('''
+    CREATE TABLE IF NOT EXISTS badges(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER,
+        badge_type TEXT,
+        date_earned TEXT
+    )
+    ''')
+
     conn.commit()
 
     cur.execute("PRAGMA table_info(requests)")
@@ -133,6 +168,18 @@ def create_db():
     if "email" not in columns:
         cur.execute("ALTER TABLE blood_banks ADD COLUMN email TEXT")
         cur.execute("ALTER TABLE blood_banks ADD COLUMN password TEXT")
+        conn.commit()
+
+    cur.execute("PRAGMA table_info(users)")
+    columns = [row[1] for row in cur.fetchall()]
+    if "referral_code" not in columns:
+        cur.execute("ALTER TABLE users ADD COLUMN referral_code TEXT")
+        conn.commit()
+    if "role" not in columns:
+        cur.execute("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'donor'")
+        conn.commit()
+    if "is_admin" not in columns:
+        cur.execute("ALTER TABLE users ADD COLUMN is_admin INTEGER DEFAULT 0")
         conn.commit()
 
     conn.close()
@@ -357,10 +404,12 @@ def get_user_by_id(user_id):
 def add_user(name, email, password, phone, age=None, weight=None, blood=None, location=None, last_donated=None, is_donor=0, is_available=0, latitude=None, longitude=None):
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
+    referral_code = generate_referral_code()
+    role = 'donor' if is_donor else 'requester'
     cur.execute('''
-        INSERT INTO users (name, email, password, phone, age, weight, blood, location, latitude, longitude, last_donated, is_donor, is_available)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (name, email, password, phone, age, weight, blood, location, latitude, longitude, last_donated, is_donor, is_available))
+        INSERT INTO users (name, email, password, phone, age, weight, blood, location, latitude, longitude, last_donated, is_donor, is_available, referral_code, role)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (name, email, password, phone, age, weight, blood, location, latitude, longitude, last_donated, is_donor, is_available, referral_code, role))
     conn.commit()
     conn.close()
 
@@ -484,11 +533,11 @@ def get_notifications_for_donor(donor_id):
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
     cur.execute('''
-        SELECT n.id, n.request_id, n.status, r.patient_name, r.blood, r.hospital, r.location, r.units_required, r.contact_number
+        SELECT n.id, n.request_id, n.status, r.patient_name, r.blood, r.hospital, r.location, r.units_required, r.contact_number, r.is_emergency
         FROM notifications n
         JOIN requests r ON n.request_id = r.id
         WHERE n.donor_id = ? AND n.status != 'declined' AND r.status = 'open' AND r.requester_id != ?
-        ORDER BY n.id DESC
+        ORDER BY r.is_emergency DESC, n.id DESC
     ''', (donor_id, donor_id))
     notifications = cur.fetchall()
     conn.close()
@@ -653,6 +702,70 @@ def delete_drive(drive_id, bank_id):
     cur.execute("DELETE FROM drive_registrations WHERE drive_id=?", (drive_id,))
     conn.commit()
     conn.close()
+
+
+# ---------- REFERRALS ----------
+def add_referral(referrer_id, referred_id):
+    from datetime import datetime
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("INSERT INTO referrals (referrer_id, referred_id, date) VALUES (?, ?, ?)", (referrer_id, referred_id, datetime.now().isoformat()))
+    conn.commit()
+    conn.close()
+
+def get_referrals_by_user(user_id):
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM referrals WHERE referrer_id=?", (user_id,))
+    refs = cur.fetchall()
+    conn.close()
+    return refs
+
+def get_user_by_referral_code(code):
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM users WHERE referral_code=?", (code,))
+    user = cur.fetchone()
+    conn.close()
+    return user
+
+def generate_referral_code():
+    import uuid
+    return str(uuid.uuid4())[:8].upper()
+
+# ---------- STORIES ----------
+def add_story(user_id, content, image_url=None, privacy='public'):
+    from datetime import datetime
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("INSERT INTO stories (user_id, content, image_url, date, privacy) VALUES (?, ?, ?, ?, ?)", (user_id, content, image_url, datetime.now().isoformat(), privacy))
+    conn.commit()
+    conn.close()
+
+def get_stories():
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("SELECT s.*, u.name FROM stories s JOIN users u ON s.user_id = u.id WHERE s.privacy='public' ORDER BY s.date DESC")
+    stories = cur.fetchall()
+    conn.close()
+    return stories
+
+# ---------- BADGES ----------
+def add_badge(user_id, badge_type):
+    from datetime import datetime
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("INSERT INTO badges (user_id, badge_type, date_earned) VALUES (?, ?, ?)", (user_id, badge_type, datetime.now().isoformat()))
+    conn.commit()
+    conn.close()
+
+def get_badges_by_user(user_id):
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM badges WHERE user_id=?", (user_id,))
+    badges = cur.fetchall()
+    conn.close()
+    return badges
 
 def update_donor_status(user_id, is_donor):
     conn = sqlite3.connect(DB_NAME)

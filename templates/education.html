@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>BloodConnect — Education Hub</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+
+<body class="has-bottom-nav">
+    <nav class="navbar">
+        <div class="menu">☰</div>
+        <div class="logo">BloodConnect</div>
+        <div class="nav-links">
+            <a href="/logout">Logout</a>
+        </div>
+    </nav>
+
+    <main class="profile-container">
+        <section class="profile-hero">
+            <h1>Blood Donation Education Hub</h1>
+            <p>Learn about blood types, donation myths, and health benefits.</p>
+        </section>
+
+        <section class="profile-section">
+            <div class="section-header">
+                <h2>Blood Types & Compatibility</h2>
+                <p>Understanding your blood type and who you can donate to.</p>
+            </div>
+            <div class="card-grid">
+                <div class="request-card">
+                    <h3>A+ Blood Type</h3>
+                    <p>Can donate to: A+, AB+</p>
+                    <p>Can receive from: A+, A-, O+, O-</p>
+                </div>
+                <div class="request-card">
+                    <h3>B+ Blood Type</h3>
+                    <p>Can donate to: B+, AB+</p>
+                    <p>Can receive from: B+, B-, O+, O-</p>
+                </div>
+                <div class="request-card">
+                    <h3>O+ Blood Type</h3>
+                    <p>Can donate to: O+, A+, B+, AB+</p>
+                    <p>Can receive from: O+, O-</p>
+                </div>
+                <div class="request-card">
+                    <h3>AB+ Blood Type</h3>
+                    <p>Can donate to: AB+</p>
+                    <p>Can receive from: All types</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="profile-section">
+            <div class="section-header">
+                <h2>Common Myths</h2>
+                <p>Debunking misconceptions about blood donation.</p>
+            </div>
+            <ul>
+                <li><strong>Myth:</strong> Donating blood makes you weak. <strong>Fact:</strong> Your body replaces the
+                    blood within 24 hours.</li>
+                <li><strong>Myth:</strong> You can get diseases from donating. <strong>Fact:</strong> Sterile equipment
+                    is used for each donor.</li>
+                <li><strong>Myth:</strong> Only certain people can donate. <strong>Fact:</strong> Most healthy adults
+                    can donate.</li>
+            </ul>
+        </section>
+
+        <section class="profile-section">
+            <div class="section-header">
+                <h2>Health Benefits</h2>
+                <p>Why donating blood is good for you.</p>
+            </div>
+            <ul>
+                <li>Reduces risk of heart disease</li>
+                <li>Helps maintain healthy iron levels</li>
+                <li>Stimulates blood cell production</li>
+                <li>Provides free health screening</li>
+            </ul>
+        </section>
+    </main>
+
+    <footer class="bottom-nav">
+        <a href="/" class="nav-item">
+            <i class="fa-solid fa-house"></i>
+            <span>Home</span>
+        </a>
+        <a href="/profile" class="nav-item">
+            <i class="fa-solid fa-user"></i>
+            <span>Profile</span>
+        </a>
+    </footer>
+</body>
+
+</html>

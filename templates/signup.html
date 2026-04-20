@@ -40,6 +40,9 @@
         <label>Phone</label>
         <input type="tel" name="phone" placeholder="Enter your phone number" required>
 
+        <label>Referral Code (optional)</label>
+        <input type="text" name="referral_code" value="{{ referral_code or '' }}" placeholder="Enter referral code if invited">
+
         <label>Age</label>
         <input type="number" name="age" placeholder="Enter your age" min="18" max="65" required>
 

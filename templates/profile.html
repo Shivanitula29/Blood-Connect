@@ -62,10 +62,11 @@
             {% if notifications %}
             <div class="card-grid">
                 {% for notification in notifications %}
-                <div class="notification-card">
+                <div class="notification-card{% if notification[9] %} emergency-card{% endif %}">
                     <div class="request-top">
                         <h3>{{ notification[3] }} needs {{ notification[4] }}</h3>
                         <span class="pill {{ notification[2] }}">{{ notification[2] | capitalize }}</span>
+                        {% if notification[9] %}<span class="pill emergency">Emergency</span>{% endif %}
                     </div>
                     <p><strong>Hospital:</strong> {{ notification[5] }}</p>
                     <p><strong>Location:</strong> {{ notification[6] }}</p>
@@ -96,7 +97,7 @@
             {% if emergency_requests %}
             <div class="card-grid">
                 {% for req in emergency_requests %}
-                <div class="request-card emergency-card request-card-link" data-request-id="{{ req.id }}" data-is-emergency="true">
+                <div class="request-card request-card-link" data-request-id="{{ req.id }}" data-is-emergency="true">
                     <div class="request-top">
                         <h3>{{ req.patient_name }}</h3>
                         <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
@@ -728,6 +729,10 @@
         let modalMap = null;
 
         function showRequestDetails(requestId, isEmergency) {
+            if (isEmergency) {
+                window.location.href = `/emergency?request_id=${requestId}`;
+                return;
+            }
             fetch(`/request-details?request_id=${requestId}`)
                 .then(response => response.json())
                 .then(data => {
@@ -742,11 +747,7 @@
                             </div>
                         `;
                             });
-                            if (isEmergency) {
-                                initModalMap(data.request, data.donors);
-                            } else {
-                                document.getElementById('modalMap').style.display = 'none';
-                            }
+                            document.getElementById('modalMap').style.display = 'none';
                         } else {
                             document.getElementById('modalDonors').innerHTML += '<p>No accepted donors yet.</p>';
                             document.getElementById('modalMap').style.display = 'none';

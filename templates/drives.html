@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>Donation Drives — BloodConnect</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+
+<body>
+
+    <div class="navbar">
+        <div class="menu">☰</div>
+        <div class="logo">BloodConnect</div>
+        <div class="nav-links">
+            {% if user %}
+            <a href="/">Home</a>
+            <a href="/profile">Profile</a>
+            <a href="/logout">Logout</a>
+            {% else %}
+            <a href="/">Home</a>
+            <a href="/login">Sign In</a>
+            <a href="/signup">Sign Up</a>
+            {% endif %}
+        </div>
+    </div>
+
+    <section style="margin: 40px auto; max-width: 1200px; padding: 0 20px;">
+        <h2>Upcoming <span>Donation Drives</span></h2>
+        {% if drives %}
+        <div
+            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; margin-top: 20px;">
+            {% for drive in drives %}
+            <div class="card" style="margin: 0;">
+                <h3 style="color: #c1121f; margin-top: 0;">{{ drive.title }}</h3>
+                <p><strong>Blood Bank:</strong> {{ drive.bank_name }}</p>
+                <p><strong>Date:</strong> {{ drive.date }} (Deadline: {{ drive.deadline }})</p>
+                <p><strong>Location:</strong> {{ drive.location }}</p>
+                <p style="color: #666; font-size: 0.9em; margin-bottom: 20px;">{{ drive.description }}</p>
+
+                {% if user and user.get('role') == 'donor' %}
+                {% if drive.is_registered %}
+                <button class="secondary-btn" style="width: 100%; border-color: #c1121f; color: #c1121f;"
+                    onclick="cancelDrive({{ drive.id }})">Cancel Registration</button>
+                {% else %}
+                <button class="primary-btn" style="width: 100%;" onclick="registerDrive({{ drive.id }})">Register for
+                    Drive</button>
+                {% endif %}
+                {% elif user and user.get('role') == 'bank' %}
+                <!-- Banks manage their drives in their profile -->
+                {% else %}
+                <button class="primary-btn" style="width: 100%;" onclick="location.href='/login'">Log in to
+                    Register</button>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <p style="color: #666;">There are no upcoming donation drives scheduled at this time.</p>
+        {% endif %}
+    </section>
+
+    <script>
+        function registerDrive(driveId) {
+            fetch('/register-drive', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ drive_id: driveId })
+            }).then(r => r.json()).then(d => {
+                if (d.success) location.reload();
+                else alert('Failed to register.');
+            });
+        }
+        function cancelDrive(driveId) {
+            fetch('/cancel-drive', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ drive_id: driveId })
+            }).then(r => r.json()).then(d => {
+                if (d.success) location.reload();
+                else alert('Failed to cancel registration.');
+            });
+        }
+    </script>
+
+</body>
+
+</html>

@@ -1,7 +1,90 @@
-<h2>Admin Login</h2>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>BloodConnect — Admin Panel</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+<body class="has-bottom-nav">
+    <nav class="navbar">
+        <div class="menu">☰</div>
+        <div class="logo">BloodConnect</div>
+        <div class="nav-links">
+            <a href="/logout">Logout</a>
+        </div>
+    </nav>
 
-<form method="POST">
-    <input type="text" name="username" placeholder="Username" required><br><br>
-    <input type="password" name="password" placeholder="Password" required><br><br>
-    <button type="submit">Login</button>
-</form>
+    <main class="profile-container">
+        <section class="profile-hero">
+            <h1>Admin Panel</h1>
+            <p>Manage users, requests, and system stats.</p>
+        </section>
+
+        <section class="profile-section">
+            <div class="section-header">
+                <h2>System Statistics</h2>
+            </div>
+            <div class="stats-grid">
+                <div class="stat-card">
+                    <h3>{{ users|length }}</h3>
+                    <p>Total Users</p>
+                </div>
+                <div class="stat-card">
+                    <h3>{{ requests|length }}</h3>
+                    <p>Total Requests</p>
+                </div>
+                <div class="stat-card">
+                    <h3>{{ users|selectattr('is_donor', 'equalto', 1)|list|length }}</h3>
+                    <p>Active Donors</p>
+                </div>
+                <div class="stat-card">
+                    <h3>{{ requests|selectattr('is_emergency', 'equalto', 1)|list|length }}</h3>
+                    <p>Emergency Requests</p>
+                </div>
+            </div>
+        </section>
+
+        <section class="profile-section">
+            <div class="section-header">
+                <h2>Recent Users</h2>
+            </div>
+            <div class="card-grid">
+                {% for user in users[-5:] %}
+                <div class="request-card">
+                    <h3>{{ user[1] }}</h3>
+                    <p>Email: {{ user[2] }}</p>
+                    <p>Role: {{ user[14] }}</p>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+
+        <section class="profile-section">
+            <div class="section-header">
+                <h2>Recent Requests</h2>
+            </div>
+            <div class="card-grid">
+                {% for req in requests[-5:] %}
+                <div class="request-card">
+                    <h3>{{ req[1] }}</h3>
+                    <p>Blood: {{ req[4] }}</p>
+                    <p>Emergency: {{ 'Yes' if req[12] else 'No' }}</p>
+                </div>
+                {% endfor %}
+            </div>
+        </section>
+    </main>
+
+    <footer class="bottom-nav">
+        <a href="/" class="nav-item">
+            <i class="fa-solid fa-house"></i>
+            <span>Home</span>
+        </a>
+        <a href="/profile" class="nav-item">
+            <i class="fa-solid fa-user"></i>
+            <span>Profile</span>
+        </a>
+    </footer>
+</body>
+</html>

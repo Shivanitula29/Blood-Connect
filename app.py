@@ -38,7 +38,15 @@ from database import (
     cancel_drive_registration,
     get_drive_registrations,
     complete_drive,
-    delete_drive
+    delete_drive,
+    add_referral,
+    get_referrals_by_user,
+    generate_referral_code,
+    add_story,
+    get_stories,
+    add_badge,
+    get_badges_by_user,
+    get_user_by_referral_code
 )
 import sqlite3
 from math import radians, sin, cos, sqrt, atan2
@@ -134,6 +142,45 @@ def home():
     return render_template("index.html", drives=drives)
 
 
+@app.route('/drives')
+@login_required
+def drives_page():
+    user = session.get('user')
+    drives_raw = get_all_open_drives()
+    drives = []
+    
+    if user and user.get('role') == 'donor':
+        donor_id = user['id']
+        for d in drives_raw:
+            regs = get_drive_registrations(d[0]) # d[0] is drive_id
+            is_reg = any(r[0] == donor_id for r in regs) # r[0] is donor id
+            drives.append({
+                'id': d[0],
+                'title': d[2],
+                'date': d[3],
+                'deadline': d[4],
+                'location': d[5],
+                'description': d[6],
+                'bank_name': d[8],  # index 8 is b.name
+                'is_registered': is_reg
+            })
+    else:
+        # If not logged in or is a bank, just show drives without registration status
+        for d in drives_raw:
+            drives.append({
+                'id': d[0],
+                'title': d[2],
+                'date': d[3],
+                'deadline': d[4],
+                'location': d[5],
+                'description': d[6],
+                'bank_name': d[8],
+                'is_registered': False
+            })
+
+    return render_template("drives.html", drives=drives)
+
+
 @app.route('/donor')
 @login_required
 def donor_page():
@@ -155,6 +202,28 @@ def emergency_page():
         if req and req[11] == session['user']['id'] and req[12]:  # is_emergency
             return render_template("emergency.html", show_tracker=True, request_id=request_id)
     return render_template("emergency.html")
+
+
+@app.route('/education')
+@login_required
+def education_page():
+    return render_template("education.html")
+
+
+@app.route('/stories')
+@login_required
+def stories_page():
+    stories = get_stories()
+    return render_template("stories.html", stories=stories)
+
+
+@app.route('/certificate/<int:user_id>')
+@login_required
+def certificate(user_id):
+    if session['user']['id'] != user_id:
+        return "Unauthorized", 403
+    # Placeholder for PDF generation
+    return "Certificate PDF would be generated here"
 
 
 @app.route('/bloodbank')
@@ -199,6 +268,7 @@ def signup_page():
         longitude = request.form.get("longitude", "")
         is_donor = int(request.form.get("is_donor", 0))
         last_donated = request.form.get("last_donated") or None
+        referral_code = request.form.get("referral_code", "").strip()
 
         # Backend validations
         if not name or len(name) < 2:
@@ -238,11 +308,17 @@ def signup_page():
 
         try:
             add_user(name, email, password, phone, age_num, weight_num, blood, location, last_donated, is_donor, is_available, float(latitude), float(longitude))
+            new_user = get_user_by_email_or_phone(email)
+            if referral_code and new_user:
+                referrer = get_user_by_referral_code(referral_code)
+                if referrer:
+                    add_referral(referrer[0], new_user[0])
             return render_template("login.html", success="Account created successfully! Please log in.")
         except Exception as e:
             return render_template("signup.html", error="Could not create account. Please try again.")
 
-    return render_template("signup.html")
+    ref = request.args.get('ref')
+    return render_template("signup.html", referral_code=ref)
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -257,9 +333,10 @@ def login_page():
                 "id": user[0],
                 "name": user[1],
                 "email": user[2],
-                "role": "donor",
+                "role": user[14],
                 "is_donor": bool(user[12]),
-                "is_available": bool(user[13])
+                "is_available": bool(user[13]),
+                "is_admin": bool(user[15])
             }
             next_page = session.pop('next', '/profile')
             return redirect(next_page)
@@ -270,7 +347,8 @@ def login_page():
                 "id": bank[0],
                 "name": bank[1],
                 "email": bank[7],
-                "role": "bank"
+                "role": "bank",
+                "is_admin": False
             }
             next_page = session.pop('next', '/profile')
             return redirect(next_page)
@@ -342,7 +420,7 @@ def show_results(request_id):
         if donor[0] == session['user']['id']:
             continue
         donor_blood = donor[7]
-        if donor_blood in compatible_blood_groups:
+        if req[12] or donor_blood in compatible_blood_groups:  # For emergency, show all donors
             distance = None
             if req[9] and req[10] and donor[9] and donor[10]:
                 distance = haversine(req[9], req[10], donor[9], donor[10])
@@ -362,7 +440,7 @@ def show_results(request_id):
     blood_banks = get_all_blood_banks()
     bank_list = []
     for bank in blood_banks:
-        if req[4] in bank[2]:
+        if req[12] or req[4] in bank[2]:  # For emergency, show all banks
             distance = None
             if req[9] and req[10] and bank[4] and bank[5]:
                 distance = haversine(req[9], req[10], bank[4], bank[5])
@@ -818,20 +896,36 @@ def update_bloodbank_stock():
     return jsonify({'success': True})
 
 
+# ---------- NEW FEATURES ----------
+
+@app.route('/add-story', methods=['POST'])
+@login_required
+def add_story_route():
+    data = request.get_json()
+    content = data.get('content')
+    image_url = data.get('image_url')
+    privacy = data.get('privacy', 'public')
+    add_story(session['user']['id'], content, image_url, privacy)
+    return jsonify({"success": True})
+
+@app.route('/get-referral-link')
+@login_required
+def get_referral_link():
+    user = get_user_by_id(session['user']['id'])
+    referral_code = user[14]  # referral_code
+    link = f"{request.host_url}signup?ref={referral_code}"
+    return jsonify({"link": link})
+
+
 # ---------- ADMIN PANEL ----------
-@app.route("/admin", methods=["GET", "POST"])
-def admin():
-    if request.method == "POST":
-        username = request.form["username"]
-        password = request.form["password"]
-
-        if username == "admin" and password == "admin123":
-            session["admin"] = True
-            return redirect("/dashboard")
-        else:
-            return "Invalid Credentials"
-
-    return render_template("admin.html")
+@app.route('/admin')
+@login_required
+def admin_page():
+    if not session['user'].get('is_admin'):
+        return redirect('/')
+    users = get_all_users()
+    requests = get_all_requests()
+    return render_template("admin.html", users=users, requests=requests)
 
 
 @app.route("/dashboard")

@@ -506,6 +506,12 @@ body {
 
     .hero-section {
         padding: 50px 20px 30px;
+        grid-template-columns: 1fr; /* Stack on mobile */
+        text-align: center; /* Center content on mobile */
+    }
+
+    .hero-right img {
+        max-width: 300px;
     }
 
     .hero-left h1 {
@@ -1347,4 +1353,31 @@ input:checked + .slider:before {
 
 .donor-info a:hover {
     text-decoration: underline;
+}
+
+/* Stats Grid */
+.stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 20px;
+}
+
+.stat-card {
+    background: white;
+    padding: 20px;
+    border-radius: 20px;
+    text-align: center;
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.06);
+    border: 1px solid #ffe4e4;
+}
+
+.stat-card h3 {
+    margin: 0;
+    font-size: 2em;
+    color: #1f7a3d;
+}
+
+.stat-card p {
+    margin: 5px 0 0;
+    color: #666;
 }

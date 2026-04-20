@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>BloodConnect — Stories</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+
+<body class="has-bottom-nav">
+    <nav class="navbar">
+        <div class="menu">☰</div>
+        <div class="logo">BloodConnect</div>
+        <div class="nav-links">
+            <a href="/logout">Logout</a>
+        </div>
+    </nav>
+
+    <main class="profile-container">
+        <section class="profile-hero">
+            <h1>Donation Stories</h1>
+            <p>Share and read inspiring stories from our community.</p>
+        </section>
+
+        <section class="profile-section">
+            <div class="section-header">
+                <h2>Share Your Story</h2>
+                <p>Inspire others with your donation experience.</p>
+            </div>
+            <div class="edit-profile-card">
+                <form id="storyForm">
+                    <label>Story Content</label>
+                    <textarea id="storyContent" rows="4" placeholder="Tell your story..."></textarea>
+                    <label>Image URL (optional)</label>
+                    <input type="url" id="storyImage" placeholder="https://example.com/image.jpg">
+                    <label>Privacy</label>
+                    <select id="storyPrivacy">
+                        <option value="public">Public</option>
+                        <option value="private">Private</option>
+                    </select>
+                    <button type="button" onclick="submitStory()" class="primary-btn">Share Story</button>
+                </form>
+                <p id="storyMsg"></p>
+            </div>
+        </section>
+
+        <section class="profile-section">
+            <div class="section-header">
+                <h2>Community Stories</h2>
+                <p>Stories from our donors.</p>
+            </div>
+            {% if stories %}
+            <div class="card-grid">
+                {% for story in stories %}
+                <div class="request-card">
+                    <h3>{{ story[7] }} ({{ story[6] }})</h3>
+                    <p>{{ story[2] }}</p>
+                    {% if story[3] %}
+                    <img src="{{ story[3] }}" alt="Story image" style="max-width:100%; height:auto;">
+                    {% endif %}
+                    <p><small>{{ story[4] }}</small></p>
+                    <button onclick="shareStory('{{ story[2] }}')" class="secondary-btn">Share on Social</button>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="empty-state">No stories yet. Be the first to share!</div>
+            {% endif %}
+        </section>
+    </main>
+
+    <footer class="bottom-nav">
+        <a href="/" class="nav-item">
+            <i class="fa-solid fa-house"></i>
+            <span>Home</span>
+        </a>
+        <a href="/profile" class="nav-item">
+            <i class="fa-solid fa-user"></i>
+            <span>Profile</span>
+        </a>
+    </footer>
+
+    <script>
+        async function submitStory() {
+            const content = document.getElementById('storyContent').value;
+            const imageUrl = document.getElementById('storyImage').value;
+            const privacy = document.getElementById('storyPrivacy').value;
+            if (!content) {
+                document.getElementById('storyMsg').innerText = 'Please enter story content.';
+                return;
+            }
+            const res = await fetch('/add-story', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ content, image_url: imageUrl, privacy })
+            });
+            const data = await res.json();
+            if (data.success) {
+                location.reload();
+            } else {
+                document.getElementById('storyMsg').innerText = 'Failed to share story.';
+            }
+        }
+
+        function shareStory(content) {
+            const url = encodeURIComponent(window.location.href);
+            const text = encodeURIComponent(content);
+            window.open(`https://twitter.com/intent/tweet?text=${text}&url=${url}`, '_blank');
+        }
+    </script>
+</body>
+
+</html>
