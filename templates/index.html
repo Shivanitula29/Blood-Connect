@@ -70,22 +70,22 @@
             <h3>Join Drives</h3>
             <p>Participate in organized blood donation drives at various locations.</p>
         </div>
-        <div class="action-card" onclick="location.href='{{ '/profile' if user else '/login?next=/profile' }}'">
+        <div class="action-card" onclick="location.href='{{ '/profile#dashboard' if user else '/login?next=/profile%23dashboard' }}'">
             <div class="icon-circle"><i class="fa-solid fa-check-circle"></i></div>
             <h3>Check Eligibility</h3>
             <p>Verify if you are eligible to donate blood.</p>
         </div>
-        <div class="action-card" onclick="location.href='{{ '/profile' if user else '/login?next=/profile' }}'">
+        <div class="action-card" onclick="location.href='{{ '/profile#achievements' if user else '/login?next=/profile%23achievements' }}'">
             <div class="icon-circle"><i class="fa-solid fa-trophy"></i></div>
             <h3>View Achievements</h3>
             <p>Check your donation milestones and badges.</p>
         </div>
-        <div class="action-card" onclick="location.href='{{ '/profile' if user else '/login?next=/profile' }}'">
+        <div class="action-card" onclick="location.href='{{ '/profile#dashboard' if user else '/login?next=/profile%23dashboard' }}'">
             <div class="icon-circle"><i class="fa-solid fa-user"></i></div>
             <h3>My Dashboard</h3>
             <p>View your donation history and manage your profile.</p>
         </div>
-        <div class="action-card" onclick="location.href='{{ '/profile' if user else '/login?next=/profile' }}'">
+        <div class="action-card" onclick="location.href='{{ '/profile#dashboard' if user else '/login?next=/profile%23dashboard' }}'">
             <div class="icon-circle"><i class="fa-solid fa-calendar-alt"></i></div>
             <h3>Schedule Appointment</h3>
             <p>Book a donation appointment at your convenience.</p>

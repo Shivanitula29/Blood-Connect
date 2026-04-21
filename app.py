@@ -333,10 +333,10 @@ def login_page():
                 "id": user[0],
                 "name": user[1],
                 "email": user[2],
-                "role": user[14],
+                "role": user[15],
                 "is_donor": bool(user[12]),
                 "is_available": bool(user[13]),
-                "is_admin": bool(user[15])
+                "is_admin": bool(user[16])
             }
             next_page = session.pop('next', '/profile')
             return redirect(next_page)
@@ -627,7 +627,8 @@ def profile_page():
         emergency_requests=emergency_requests,
         standard_requests=standard_requests,
         completed_requests=completed_requests,
-        bloodbanks=get_all_blood_banks()
+        bloodbanks=get_all_blood_banks(),
+        badges=get_badges_by_user(user['id'])
     )
 
 

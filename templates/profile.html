@@ -14,14 +14,84 @@
             margin: 16px 0;
             flex-wrap: wrap;
         }
+
         .toggle-switch input[type="checkbox"] {
             width: 46px;
             height: 24px;
             accent-color: #1f7a3d;
         }
+
         .toggle-switch .toggle-label {
             font-size: 0.95rem;
             color: #333;
+        }
+
+        .profile-layout {
+            display: flex;
+            max-width: 1200px;
+            margin: 40px auto;
+            gap: 30px;
+            padding: 0 20px;
+        }
+
+        .profile-sidebar {
+            width: 260px;
+            background: white;
+            border-radius: 12px;
+            padding: 20px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            flex-shrink: 0;
+            align-self: flex-start;
+        }
+
+        .sidebar-menu {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+        }
+
+        .sidebar-menu li {
+            padding: 12px 16px;
+            margin-bottom: 8px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: 600;
+            color: #555;
+            transition: all 0.3s;
+        }
+
+        .sidebar-menu li:hover,
+        .sidebar-menu li.active {
+            background: #ffe3e3;
+            color: #d63333;
+        }
+
+        .profile-content {
+            width: 100%;
+            min-width: 0;
+        }
+
+        .profile-section {
+            display: none !important;
+            background: white;
+            border-radius: 12px;
+            padding: 30px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+            margin-bottom: 20px;
+        }
+
+        .profile-section.active {
+            display: block !important;
+        }
+
+        @media (max-width: 768px) {
+            .profile-layout {
+                flex-direction: column;
+            }
+
+            .profile-sidebar {
+                width: auto;
+            }
         }
     </style>
 </head>
@@ -36,377 +106,471 @@
         </div>
     </nav>
 
-    <main class="profile-container">
-        <section class="profile-hero">
-            <h1>Welcome back, {{ user.name }}!</h1>
-            <p>Here are your recent blood activity updates.</p>
-        </section>
+    <main class="profile-layout">
+        <aside class="profile-sidebar">
+            <ul class="sidebar-menu">
+                {% if user.role != 'bank' %}
+                <li class="active" data-target="dashboard">Dashboard</li>
+                <li data-target="incoming">Incoming Requests for You</li>
+                <li data-target="emergency">Emergency Requests</li>
+                <li data-target="standard">Standard Blood Requests</li>
+                <li data-target="completed">Completed Requests</li>
+                <li data-target="history">Donation History</li>
+                <li data-target="achievements">Achievements</li>
+                {% elif user.role == 'bank' %}
+                <li class="active" data-target="bank-requests">Incoming Blood Requests</li>
+                <li data-target="bank-drives">My Donation Drives</li>
+                <li data-target="bank-settings">Edit Bank Settings & Stock</li>
+                <li data-target="bank-history">Donation History</li>
+                {% endif %}
+            </ul>
+        </aside>
 
-        {% if user.role == 'donor' %}
-        <section class="profile-section">
-            <div class="section-header">
-                <h2>Donor Availability</h2>
-                <p>Turn this on to appear as an available donor to others. Turn it off to hide from donor search results.</p>
-            </div>
-            <div class="toggle-switch">
-                <input type="checkbox" id="donorToggle" {% if user.is_donor %}checked{% endif %}>
-                <span class="toggle-label" id="donorToggleLabel">{% if user.is_donor %}Visible as a donor{% else %}Hidden from donor search{% endif %}</span>
-            </div>
-        </section>
-
-        <section class="profile-section">
-            <div class="section-header">
-                <h2>Incoming Requests for You</h2>
-                <p>Accept or decline requests from patients matching your blood group.</p>
-            </div>
-            {% if notifications %}
-            <div class="card-grid">
-                {% for notification in notifications %}
-                <div class="notification-card{% if notification[9] %} emergency-card{% endif %}">
-                    <div class="request-top">
-                        <h3>{{ notification[3] }} needs {{ notification[4] }}</h3>
-                        <span class="pill {{ notification[2] }}">{{ notification[2] | capitalize }}</span>
-                        {% if notification[9] %}<span class="pill emergency">Emergency</span>{% endif %}
-                    </div>
-                    <p><strong>Hospital:</strong> {{ notification[5] }}</p>
-                    <p><strong>Location:</strong> {{ notification[6] }}</p>
-                    <p><strong>Units:</strong> {{ notification[7] }}</p>
-                    <p><strong>Contact:</strong> {{ notification[8] }}</p>
-                    <div class="notification-actions">
-                        {% if notification[2] == 'pending' %}
-                        <button class="action-btn accept-btn" data-id="{{ notification[0] }}">Accept</button>
-                        <button class="action-btn decline-btn" data-id="{{ notification[0] }}">Decline</button>
-                        {% elif notification[2] == 'accepted' %}
-                        <button class="action-btn cancel-btn" data-id="{{ notification[0] }}">Cancel</button>
-                        {% endif %}
-                    </div>
+        <div class="profile-content">
+            {% if user.role != 'bank' %}
+            <section id="dashboard" class="profile-section active">
+                <div class="profile-hero"
+                    style="margin-bottom: 20px; padding: 0; max-width: none; grid-template-columns: 1fr;">
+                    <h1 style="font-size: 32px; color: #d63333; margin-top:0;">Welcome back, {{ user.name }}!</h1>
                 </div>
-                {% endfor %}
-            </div>
-            {% else %}
-            <div class="empty-state">No incoming donor requests right now. When new requests arrive, they will appear
-                here.</div>
-            {% endif %}
-        </section>
 
-        <section class="profile-section">
-            <div class="section-header">
-                <h2>Emergency Requests</h2>
-                <p>Urgent blood requests with live tracking.</p>
-            </div>
-            {% if emergency_requests %}
-            <div class="card-grid">
-                {% for req in emergency_requests %}
-                <div class="request-card request-card-link" data-request-id="{{ req.id }}" data-is-emergency="true">
-                    <div class="request-top">
-                        <h3>{{ req.patient_name }}</h3>
-                        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-                            <span class="pill">{{ req.status }}</span>
-                            <span class="pill emergency">Emergency</span>
+                <div class="section-header">
+                    <h2>Donor Availability</h2>
+                    <p>Turn this on to appear as an available donor to others. Turn it off to hide from donor search
+                        results.</p>
+                </div>
+                <div class="toggle-switch">
+                    <input type="checkbox" id="donorToggle" {% if user.is_donor %}checked{% endif %}>
+                    <span class="toggle-label" id="donorToggleLabel">{% if user.is_donor %}Visible as a donor{% else
+                        %}Hidden from donor search{% endif %}</span>
+                </div>
+
+                <div class="section-header"
+                    style="margin-top: 30px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 15px; border-bottom: 1px solid #eee; padding-bottom: 15px;">
+                    <div>
+                        <h2 style="margin: 0; color: #d63333;">Edit Profile</h2>
+                        <p style="margin: 5px 0 0; color: #666;">Update your personal information.</p>
+                    </div>
+                    <button class="secondary-btn" style="margin: 0;"
+                        onclick="document.getElementById('edit-profile-card-container').style.display = document.getElementById('edit-profile-card-container').style.display === 'none' ? 'block' : 'none'">Edit
+                        Profile <i class="fa-solid fa-pen" style="margin-left: 5px;"></i></button>
+                </div>
+                <div class="edit-profile-card" id="edit-profile-card-container"
+                    style="display:none; margin-top: 20px; padding: 25px; background: #fffdfd; border: 1px solid #ffe3e3; border-radius: 14px;">
+                    <form id="editProfileForm">
+                        <div
+                            style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 15px;">
+                            <div>
+                                <label>Name</label>
+                                <input type="text" id="edit_name" value="{{ user.name }}" required>
+                            </div>
+                            <div>
+                                <label>Email</label>
+                                <input type="email" id="edit_email" value="{{ user.email }}" required>
+                            </div>
+                            <div>
+                                <label>Phone</label>
+                                <input type="text" id="edit_phone" value="" placeholder="Enter phone" required>
+                            </div>
+                            <div>
+                                <label>Age</label>
+                                <input type="number" id="edit_age" placeholder="Enter age">
+                            </div>
+                            <div>
+                                <label>Weight (kg)</label>
+                                <input type="number" id="edit_weight" placeholder="Enter weight">
+                            </div>
+                            <div>
+                                <label>Blood Group</label>
+                                <select id="edit_blood">
+                                    <option value="">Select Blood Group</option>
+                                    <option value="A+">A+</option>
+                                    <option value="A-">A-</option>
+                                    <option value="B+">B+</option>
+                                    <option value="B-">B-</option>
+                                    <option value="O+">O+</option>
+                                    <option value="O-">O-</option>
+                                    <option value="AB+">AB+</option>
+                                    <option value="AB-">AB-</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <label style="margin-top:15px;">Location</label>
+                        <input type="text" id="edit_location" placeholder="Enter location" style="width: 100%;">
+                        <div style="margin-top: 12px;">
+                            <button type="button" onclick="useCurrentLocation()" class="secondary-btn"
+                                style="width: auto; padding: 10px 18px; white-space: nowrap; font-size: 14px;">Use
+                                Current Location</button>
+                        </div>
+
+                        <div style="margin-top: 25px; text-align: center;">
+                            <button type="button" onclick="updateProfile()" class="primary-btn submit-btn"
+                                style="padding: 14px 30px;">Save Changes</button>
+                        </div>
+                    </form>
+                    <p id="editMsg" style="text-align: center; font-weight: 600; margin-top: 15px;"></p>
+                </div>
+            </section>
+
+            <section id="incoming" class="profile-section">
+                <div class="section-header">
+                    <h2>Incoming Requests for You</h2>
+                    <p>Accept or decline requests from patients matching your blood group.</p>
+                </div>
+                {% if notifications %}
+                <div class="card-grid">
+                    {% for notification in notifications %}
+                    <div class="notification-card{% if notification[9] %} emergency-card{% endif %}">
+                        <div class="request-top">
+                            <h3>{{ notification[3] }} needs {{ notification[4] }}</h3>
+                            <span class="pill {{ notification[2] }}">{{ notification[2] | capitalize }}</span>
+                            {% if notification[9] %}<span class="pill emergency">Emergency</span>{% endif %}
+                        </div>
+                        <p><strong>Hospital:</strong> {{ notification[5] }}</p>
+                        <p><strong>Location:</strong> {{ notification[6] }}</p>
+                        <p><strong>Units:</strong> {{ notification[7] }}</p>
+                        <p><strong>Contact:</strong> {{ notification[8] }}</p>
+                        <div class="notification-actions">
+                            {% if notification[2] == 'pending' %}
+                            <button class="action-btn accept-btn" data-id="{{ notification[0] }}">Accept</button>
+                            <button class="action-btn decline-btn" data-id="{{ notification[0] }}">Decline</button>
+                            {% elif notification[2] == 'accepted' %}
+                            <button class="action-btn cancel-btn" data-id="{{ notification[0] }}">Cancel</button>
+                            {% endif %}
                         </div>
                     </div>
-                    <p><strong>Blood Group:</strong> {{ req.blood }}</p>
-                    <p><strong>Units needed:</strong> {{ req.units_required }}</p>
-                    <p><strong>Hospital:</strong> {{ req.hospital }}</p>
-                    <p><strong>Location:</strong> {{ req.location }}</p>
-                    {% if req.accepted_donors %}
-                    <div class="accepted-donors">
-                        <p><strong>Accepted Donor(s):</strong></p>
-                        {% for donor in req.accepted_donors %}
-                        <p>
-                            <input type="checkbox" class="actual-donor-checkbox" data-id="{{ donor.id }}"
-                                data-type="{{ donor.type }}">
-                            {{ donor.name }} — {{ donor.phone }}
-                        </p>
-                        {% endfor %}
-                    </div>
-                    {% endif %}
-                    <div style="margin-top: 15px; display: flex; gap: 10px;">
-                        <button type="button" class="primary-btn complete-btn" data-request-id="{{ req.id }}" style="flex: 1;">Mark
-                            as Completed</button>
-                        <button type="button" class="secondary-btn delete-request-btn"
-                            style="background-color: #ffebee; color: #c1121f; flex: 0.5;" data-request-id="{{ req.id }}">Delete</button>
-                    </div>
+                    {% endfor %}
                 </div>
-                {% endfor %}
-            </div>
-            {% else %}
-            <div class="empty-state">No emergency requests yet.</div>
-            {% endif %}
-        </section>
+                {% else %}
+                <div class="empty-state">"No incoming donor requests right now" — because no patients have requested
+                    your blood</div>
+                {% endif %}
+            </section>
 
-        <section class="profile-section">
-            <div class="section-header">
-                <h2>Standard Blood Requests</h2>
-                <p>Regular blood requests.</p>
-            </div>
-            {% if standard_requests %}
-            <div class="card-grid">
-                {% for req in standard_requests %}
-                <div class="request-card request-card-link" data-request-id="{{ req.id }}" data-is-emergency="false">
-                    <div class="request-top">
+            <section id="emergency" class="profile-section">
+                <div class="section-header">
+                    <h2>Emergency Requests</h2>
+                    <p>Urgent blood requests with live tracking.</p>
+                </div>
+                {% if emergency_requests %}
+                <div class="card-grid">
+                    {% for req in emergency_requests %}
+                    <div class="request-card request-card-link" data-request-id="{{ req.id }}" data-is-emergency="true">
+                        <div class="request-top">
+                            <h3>{{ req.patient_name }}</h3>
+                            <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+                                <span class="pill">{{ req.status }}</span>
+                                <span class="pill emergency">Emergency</span>
+                            </div>
+                        </div>
+                        <p><strong>Blood Group:</strong> {{ req.blood }}</p>
+                        <p><strong>Units needed:</strong> {{ req.units_required }}</p>
+                        <p><strong>Hospital:</strong> {{ req.hospital }}</p>
+                        <p><strong>Location:</strong> {{ req.location }}</p>
+                        {% if req.accepted_donors %}
+                        <div class="accepted-donors">
+                            <p><strong>Accepted Donor(s):</strong></p>
+                            {% for donor in req.accepted_donors %}
+                            <p>
+                                <input type="checkbox" class="actual-donor-checkbox" data-id="{{ donor.id }}"
+                                    data-type="{{ donor.type }}">
+                                {{ donor.name }} — {{ donor.phone }}
+                            </p>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                        <div style="margin-top: 15px; display: flex; gap: 10px;">
+                            <button type="button" class="primary-btn complete-btn" data-request-id="{{ req.id }}"
+                                style="flex: 1;">Mark as Completed</button>
+                            <button type="button" class="secondary-btn delete-request-btn"
+                                style="background-color: #ffebee; color: #c1121f; flex: 0.5;"
+                                data-request-id="{{ req.id }}">Delete</button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state">"No emergency requests yet" — because no emergency requests match you</div>
+                {% endif %}
+            </section>
+
+            <section id="standard" class="profile-section">
+                <div class="section-header">
+                    <h2>Standard Blood Requests</h2>
+                    <p>Regular blood requests.</p>
+                </div>
+                {% if standard_requests %}
+                <div class="card-grid">
+                    {% for req in standard_requests %}
+                    <div class="request-card request-card-link" data-request-id="{{ req.id }}"
+                        data-is-emergency="false">
+                        <div class="request-top">
+                            <h3>{{ req.patient_name }}</h3>
+                            <span class="pill">{{ req.status }}</span>
+                        </div>
+                        <p><strong>Blood Group:</strong> {{ req.blood }}</p>
+                        <p><strong>Units needed:</strong> {{ req.units_required }}</p>
+                        <p><strong>Hospital:</strong> {{ req.hospital }}</p>
+                        <p><strong>Location:</strong> {{ req.location }}</p>
+                        {% if req.accepted_donors %}
+                        <div class="accepted-donors">
+                            <p><strong>Accepted Responses:</strong></p>
+                            {% for donor in req.accepted_donors %}
+                            <p>
+                                <input type="checkbox" class="actual-donor-checkbox" data-id="{{ donor.id }}"
+                                    data-type="{{ donor.type }}">
+                                {{ donor.name }} — {{ donor.phone }}
+                            </p>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                        <div style="margin-top: 15px; display: flex; gap: 10px;">
+                            <button type="button" class="primary-btn complete-btn" data-request-id="{{ req.id }}"
+                                style="flex: 1;">Mark as Completed</button>
+                            <button type="button" class="secondary-btn delete-request-btn"
+                                style="background-color: #ffebee; color: #c1121f; flex: 0.5;"
+                                data-request-id="{{ req.id }}">Delete</button>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state">"No standard requests yet" — because no standard requests match you</div>
+                {% endif %}
+            </section>
+
+            <section id="completed" class="profile-section">
+                <div class="section-header">
+                    <h2>Completed Requests</h2>
+                    <p>Requests you marked completed after accepting a donor.</p>
+                </div>
+                {% if completed_requests %}
+                <div class="card-grid">
+                    {% for req in completed_requests %}
+                    <div class="request-card completed-card request-card-link" data-request-id="{{ req.id }}"
+                        data-is-emergency="false">
+                        <div class="request-top">
+                            <h3>{{ req.patient_name }}</h3>
+                            <span class="pill completed">Completed</span>
+                        </div>
+                        <p><strong>Blood Group:</strong> {{ req.blood }}</p>
+                        <p><strong>Units needed:</strong> {{ req.units_required }}</p>
+                        <p><strong>Hospital:</strong> {{ req.hospital }}</p>
+                        <p><strong>Location:</strong> {{ req.location }}</p>
+                        <div class="accepted-donors">
+                            <p><strong>Donor(s):</strong></p>
+                            {% for donor in req.accepted_donors %}
+                            <p>{{ donor.name }} — {{ donor.phone }}</p>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state">"No completed requests yet" — because you haven't accepted and completed any
+                    donations</div>
+                {% endif %}
+            </section>
+
+            <section id="history" class="profile-section">
+                <div class="section-header">
+                    <h2>Donation History</h2>
+                    <p>Review the donations you have accepted previously.</p>
+                </div>
+                {% if donations %}
+                <div class="card-grid">
+                    {% for donation in donations %}
+                    <div class="donation-card">
+                        <div class="request-top">
+                            <h3>{{ donation[2] }}</h3>
+                            <span class="pill completed">{{ donation[1] | capitalize }}</span>
+                        </div>
+                        <p><strong>Blood Group:</strong> {{ donation[3] }}</p>
+                        <p><strong>Hospital:</strong> {{ donation[4] }}</p>
+                        <p><strong>Location:</strong> {{ donation[5] }}</p>
+                        <p><strong>Units:</strong> {{ donation[6] }}</p>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state">No donation history shown — because you haven't donated yet</div>
+                {% endif %}
+            </section>
+
+            <section id="achievements" class="profile-section">
+                <div class="section-header">
+                    <h2>Achievements</h2>
+                    <p>Your blood donation certificates and badges.</p>
+                </div>
+                {% if badges %}
+                <div class="card-grid">
+                    {% for badge in badges %}
+                    <div class="stat-box" style="margin:0; padding:20px;">
+                        <div class="icon-circle" style="margin:0 auto 10px;">🏆</div>
+                        <h3 style="margin:0; color:#c1121f; font-size:18px;">{{ badge.name }}</h3>
+                        <p style="margin:5px 0 0; color:#666; font-size:14px;">{{ badge.description }}</p>
+                    </div>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state">No achievements yet. Keep donating to earn badges!</div>
+                {% endif %}
+            </section>
+
+            {% elif user.role == 'bank' %}
+            <section id="bank-requests" class="profile-section active">
+                <div class="profile-hero"
+                    style="margin-bottom: 20px; padding: 0; max-width: none; grid-template-columns: 1fr;">
+                    <h1 style="font-size: 32px; color: #d63333; margin-top:0;">Welcome back, {{ user.name }}!</h1>
+                </div>
+                <div class="section-header">
+                    <h2>Incoming Blood Requests</h2>
+                    <p>Hospitals and patients explicitly requesting blood from you.</p>
+                </div>
+                {% if bank_requests %}
+                <div class="card-grid">
+                    {% for req in bank_requests %}
+                    <div class="request-card {% if req.bank_status == 'accepted' %}completed-card{% endif %}">
                         <h3>{{ req.patient_name }}</h3>
-                        <span class="pill">{{ req.status }}</span>
-                    </div>
-                    <p><strong>Blood Group:</strong> {{ req.blood }}</p>
-                    <p><strong>Units needed:</strong> {{ req.units_required }}</p>
-                    <p><strong>Hospital:</strong> {{ req.hospital }}</p>
-                    <p><strong>Location:</strong> {{ req.location }}</p>
-                    {% if req.accepted_donors %}
-                    <div class="accepted-donors">
-                        <p><strong>Accepted Responses:</strong></p>
-                        {% for donor in req.accepted_donors %}
-                        <p>
-                            <input type="checkbox" class="actual-donor-checkbox" data-id="{{ donor.id }}"
-                                data-type="{{ donor.type }}">
-                            {{ donor.name }} — {{ donor.phone }}
+                        <p><strong>Blood Group:</strong> {{ req.blood }} ({{ req.units_required }} units)</p>
+                        <p><strong>Status:</strong> <span class="pill sprint">{{ req.bank_status | capitalize }}</span>
                         </p>
-                        {% endfor %}
+
+                        {% if req.bank_status == 'pending' %}
+                        <div style="margin-top:10px; display:flex; gap:10px;">
+                            <button class="primary-btn bank-action-btn" data-request-id="{{ req.0 }}"
+                                data-action="accept" style="flex:1">Accept</button>
+                            <button class="secondary-btn bank-action-btn" data-request-id="{{ req.0 }}"
+                                data-action="decline"
+                                style="flex:1; background-color:#ffebee; color:#c1121f; border-color:#c1121f;">Decline</button>
+                        </div>
+                        {% endif %}
                     </div>
-                    {% endif %}
-                    <div style="margin-top: 15px; display: flex; gap: 10px;">
-                        <button type="button" class="primary-btn complete-btn" data-request-id="{{ req.id }}" style="flex: 1;">Mark
-                            as Completed</button>
-                        <button type="button" class="secondary-btn delete-request-btn"
-                            style="background-color: #ffebee; color: #c1121f; flex: 0.5;" data-request-id="{{ req.id }}">Delete</button>
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state">No blood requests targeted to your bank yet.</div>
+                {% endif %}
+            </section>
+
+            <section id="bank-drives" class="profile-section">
+                <div class="section-header">
+                    <h2>My Donation Drives</h2>
+                    <p>Organize campaigns to restock your inventory.</p>
+                    <div style="text-align: right; margin-top:-30px;">
+                        <button class="primary-btn" onclick="toggleDriveModal()" style="width:auto; padding:8px 16px;">+
+                            Plan a Drive</button>
                     </div>
                 </div>
-                {% endfor %}
-            </div>
-            {% else %}
-            <div class="empty-state">No standard requests yet. <a href="/request">Create one</a>.</div>
-            {% endif %}
-        </section>
-
-        <section class="profile-section">
-            <div class="section-header">
-                <h2>Completed Requests</h2>
-                <p>Requests you marked completed after accepting a donor.</p>
-            </div>
-            {% if completed_requests %}
-            <div class="card-grid">
-                {% for req in completed_requests %}
-                <div class="request-card completed-card request-card-link" data-request-id="{{ req.id }}" data-is-emergency="false">
-                    <div class="request-top">
-                        <h3>{{ req.patient_name }}</h3>
-                        <span class="pill completed">Completed</span>
+                {% if bank_drives %}
+                <div class="card-grid">
+                    {% for drive in bank_drives %}
+                    <div class="request-card {% if drive.status == 'completed' %}completed-card{% endif %}">
+                        <h3>{{ drive.title }} <span class="pill" style="float:right">{{ drive.status }}</span></h3>
+                        <p><strong>Date:</strong> {{ drive.date }}</p>
+                        {% if drive.status == 'open' %}
+                        {% if drive.registrations %}
+                        <p><strong>Registered Donors:</strong></p>
+                        <div class="accepted-donors">
+                            {% for r in drive.registrations %}
+                            <label style="display:block; margin-bottom:10px;">
+                                <input type="checkbox" class="drive-donor-checkbox-{{ drive.id }}" value="{{ r[0] }}">
+                                {{ r[1] }} ({{ r[3] }}) - {{ r[2] }}
+                            </label>
+                            {% endfor %}
+                        </div>
+                        <button class="primary-btn complete-drive-btn" style="margin-top:10px; width:100%"
+                            data-drive-id="{{ drive.id }}">Mark Donated & Finish Drive</button>
+                        {% else %}
+                        <p style="color:#888;">No registrations yet.</p>
+                        {% endif %}
+                        {% endif %}
                     </div>
-                    <p><strong>Blood Group:</strong> {{ req.blood }}</p>
-                    <p><strong>Units needed:</strong> {{ req.units_required }}</p>
-                    <p><strong>Hospital:</strong> {{ req.hospital }}</p>
-                    <p><strong>Location:</strong> {{ req.location }}</p>
-                    <div class="accepted-donors">
-                        <p><strong>Donor(s):</strong></p>
-                        {% for donor in req.accepted_donors %}
-                        <p>{{ donor.name }} — {{ donor.phone }}</p>
-                        {% endfor %}
+                    {% endfor %}
+                </div>
+                {% else %}
+                <div class="empty-state">You haven't arranged any donation drives.</div>
+                {% endif %}
+            </section>
+
+            <section id="bank-settings" class="profile-section">
+                <div class="edit-profile-card">
+                    <h2>Update Inventory</h2>
+                    <p style="margin-bottom:10px; color:#666;">Update your immediate blood stock here so users can find
+                        you.</p>
+                    <form id="updateStockForm">
+                        <label>Blood Group</label>
+                        <select id="update_blood_group">
+                            <option value="">Select Blood Group</option>
+                            <option value="A+">A+</option>
+                            <option value="A-">A-</option>
+                            <option value="B+">B+</option>
+                            <option value="B-">B-</option>
+                            <option value="O+">O+</option>
+                            <option value="O-">O-</option>
+                            <option value="AB+">AB+</option>
+                            <option value="AB-">AB-</option>
+                        </select>
+
+                        <label>Units Available</label>
+                        <input type="number" id="update_units" min="0">
+
+                        <button type="button" onclick="updateStock()" class="primary-btn"
+                            style="margin-top:15px; width:100%;">Update Stock</button>
+                        <p id="updateMsg"></p>
+                    </form>
+
+                    <hr style="margin:30px 0; border:1px solid #eee;">
+
+                    <h2>Edit Bank Settings</h2>
+                    <label>Bank Name</label>
+                    <input type="text" id="edit_bank_name" value="{{ user.name }}" disabled>
+                    <label>Contact Email</label>
+                    <input type="text" id="edit_bank_email" value="{{ user.email }}" disabled>
+                    <p style="color:#666; font-size:0.9em; margin-bottom:10px;">Contact admin to change locked settings.
+                    </p>
+                    <div style="margin-top: 12px;">
+                        <button type="button" onclick="alert('Profile Settings Sent.')" class="primary-btn"
+                            style="width: 100%;">Save Base Profile</button>
                     </div>
                 </div>
-                {% endfor %}
-            </div>
-            {% else %}
-            <div class="empty-state">No completed requests yet. Complete a request after a donor accepts it.</div>
-            {% endif %}
-        </section>
+            </section>
 
-
-
-        <section class="profile-section">
-            <div class="section-header">
-                <h2>Donation History</h2>
-                <p>Review the donations you have accepted previously.</p>
-            </div>
-            {% if donations %}
-            <div class="card-grid">
-                {% for donation in donations %}
-                <div class="donation-card">
-                    <div class="request-top">
-                        <h3>{{ donation[2] }}</h3>
-                        <span class="pill completed">{{ donation[1] | capitalize }}</span>
-                    </div>
-                    <p><strong>Blood Group:</strong> {{ donation[3] }}</p>
-                    <p><strong>Hospital:</strong> {{ donation[4] }}</p>
-                    <p><strong>Location:</strong> {{ donation[5] }}</p>
-                    <p><strong>Units:</strong> {{ donation[6] }}</p>
+            <section id="bank-history" class="profile-section">
+                <div class="section-header">
+                    <h2>Donation History</h2>
+                    <p>Blood units the bank supplied to any requester.</p>
                 </div>
-                {% endfor %}
-            </div>
-            {% else %}
-            {% endif %}
-        </section>
-
-        <div style="text-align: center; margin: 20px 0;">
-            <button id="editProfileBtn" class="primary-btn" onclick="toggleEditProfile()"
-                style="width: auto; padding: 12px 24px;">Edit Profile</button>
-        </div>
-
-        <div id="editProfileSection" class="profile-section" style="display: none;">
-            <div class="section-header">
-                <h2>Edit Profile</h2>
-                <p>Update your personal information.</p>
-            </div>
-            <div class="edit-profile-card">
-                <form id="editProfileForm">
-                    <label>Name</label>
-                    <input type="text" id="edit_name" value="{{ user.name }}" required>
-
-                    <label>Email</label>
-                    <input type="email" id="edit_email" value="{{ user.email }}" required>
-
-                    <label>Phone</label>
-                    <input type="text" id="edit_phone" value="" placeholder="Enter phone" required>
-
-                    <label>Age</label>
-                    <input type="number" id="edit_age" placeholder="Enter age">
-
-                    <label>Weight (kg)</label>
-                    <input type="number" id="edit_weight" placeholder="Enter weight">
-
-                    <label>Blood Group</label>
-                    <select id="edit_blood">
-                        <option value="">Select Blood Group</option>
-                        <option value="A+">A+</option>
-                        <option value="A-">A-</option>
-                        <option value="B+">B+</option>
-                        <option value="B-">B-</option>
-                        <option value="O+">O+</option>
-                        <option value="O-">O-</option>
-                        <option value="AB+">AB+</option>
-                        <option value="AB-">AB-</option>
-                    </select>
-
-                    <label>Location</label>
-                    <input type="text" id="edit_location" placeholder="Enter location" style="width: 100%;">
-                    <div style="margin-top: 12px; text-align: center;">
-                        <button type="button" onclick="useCurrentLocation()" class="secondary-btn"
-                            style="width: auto; padding: 12px 20px; white-space: nowrap;">Use Current Location</button>
-                    </div>
-
-                    <div style="margin-top: 20px; text-align: center;">
-                        <button type="button" onclick="updateProfile()" class="primary-btn submit-btn">Update
-                            Profile</button>
-                    </div>
-                </form>
-                <p id="editMsg"></p>
-            </div>
-        </div>
-
-        {% elif user.role == 'bank' %}
-        <section class="profile-section">
-            <div class="section-header">
-                <h2>Incoming Blood Requests</h2>
-                <p>Hospitals and patients explicitly requesting blood from you.</p>
-            </div>
-            {% if bank_requests %}
-            <div class="card-grid">
+                {% set has_accepted = false %}
+                {% if bank_requests %}
                 {% for req in bank_requests %}
-                <div class="request-card {% if req.bank_status == 'accepted' %}completed-card{% endif %}">
-                    <h3>{{ req.patient_name }}</h3>
-                    <p><strong>Blood Group:</strong> {{ req.blood }} ({{ req.units_required }} units)</p>
-                    <p><strong>Status:</strong> <span class="pill sprint">{{ req.bank_status | capitalize }}</span></p>
+                {% if req.bank_status == 'accepted' %}
+                {% set has_accepted = true %}
+                {% endif %}
+                {% endfor %}
+                {% endif %}
 
-                    {% if req.bank_status == 'pending' %}
-                    <div style="margin-top:10px; display:flex; gap:10px;">
-                        <button class="primary-btn bank-action-btn" data-request-id="{{ req.0 }}" data-action="accept"
-                            style="flex:1">Accept</button>
-                        <button class="secondary-btn bank-action-btn" data-request-id="{{ req.0 }}" data-action="decline"
-                            style="flex:1; background-color:#ffebee; color:#c1121f; border-color:#c1121f;">Decline</button>
+                {% if has_accepted %}
+                <div class="card-grid">
+                    {% for req in bank_requests %}
+                    {% if req.bank_status == 'accepted' %}
+                    <div class="request-card completed-card">
+                        <h3>{{ req.patient_name }}</h3>
+                        <p><strong>Blood Group:</strong> {{ req.blood }} ({{ req.units_required }} units)</p>
+                        <p><strong>Status:</strong> <span class="pill sprint">{{ req.bank_status | capitalize }}</span>
+                        </p>
                     </div>
                     {% endif %}
+                    {% endfor %}
                 </div>
-                {% endfor %}
-            </div>
-            {% else %}
-            <div class="empty-state">No blood requests targeted to your bank yet.</div>
+                {% else %}
+                <div class="empty-state">No donation history shown — because you haven't supplied any blood yet</div>
+                {% endif %}
+            </section>
+
             {% endif %}
-        </section>
-
-        <section class="profile-section">
-            <div class="section-header">
-                <h2>My Donation Drives</h2>
-                <p>Organize campaigns to restock your inventory.</p>
-                <div style="text-align: right; margin-top:-30px;">
-                    <button class="primary-btn" onclick="toggleDriveModal()" style="width:auto; padding:8px 16px;">+
-                        Plan a Drive</button>
-                </div>
-            </div>
-            {% if bank_drives %}
-            <div class="card-grid">
-                {% for drive in bank_drives %}
-                <div class="request-card {% if drive.status == 'completed' %}completed-card{% endif %}">
-                    <h3>{{ drive.title }} <span class="pill" style="float:right">{{ drive.status }}</span></h3>
-                    <p><strong>Date:</strong> {{ drive.date }}</p>
-                    {% if drive.status == 'open' %}
-                    {% if drive.registrations %}
-                    <p><strong>Registered Donors:</strong></p>
-                    <div class="accepted-donors">
-                        {% for r in drive.registrations %}
-                        <label style="display:block; margin-bottom:10px;">
-                            <input type="checkbox" class="drive-donor-checkbox-{{ drive.id }}" value="{{ r[0] }}">
-                            {{ r[1] }} ({{ r[3] }}) - {{ r[2] }}
-                        </label>
-                        {% endfor %}
-                    </div>
-                    <button class="primary-btn complete-drive-btn" style="margin-top:10px; width:100%" data-drive-id="{{ drive.id }}">Mark Donated & Finish Drive</button>
-                    {% else %}
-                    <p style="color:#888;">No registrations yet.</p>
-                    {% endif %}
-                    {% endif %}
-                </div>
-                {% endfor %}
-            </div>
-            {% else %}
-            <div class="empty-state">You haven't arranged any donation drives.</div>
-            {% endif %}
-        </section>
-
-        <div style="text-align: center; margin: 20px 0;">
-            <button class="primary-btn" onclick="toggleBankEdit()" style="width: auto; padding: 12px 24px;">Edit Bank
-                Settings & Stock</button>
         </div>
-
-        <div id="editBankSection" class="profile-section" style="display:none;">
-            <div class="edit-profile-card">
-                <h2>Update Inventory</h2>
-                <p style="margin-bottom:10px; color:#666;">Update your immediate blood stock here so users can find you.
-                </p>
-                <form id="updateStockForm">
-                    <label>Blood Group</label>
-                    <select id="update_blood_group">
-                        <option value="">Select Blood Group</option>
-                        <option value="A+">A+</option>
-                        <option value="A-">A-</option>
-                        <option value="B+">B+</option>
-                        <option value="B-">B-</option>
-                        <option value="O+">O+</option>
-                        <option value="O-">O-</option>
-                        <option value="AB+">AB+</option>
-                        <option value="AB-">AB-</option>
-                    </select>
-
-                    <label>Units Available</label>
-                    <input type="number" id="update_units" min="0">
-
-                    <button type="button" onclick="updateStock()" class="primary-btn"
-                        style="margin-top:15px; width:100%;">Update Stock</button>
-                    <p id="updateMsg"></p>
-                </form>
-
-                <hr style="margin:30px 0; border:1px solid #eee;">
-
-                <h2>Edit Bank Settings</h2>
-                <label>Bank Name</label>
-                <input type="text" id="edit_bank_name" value="{{ user.name }}" disabled>
-                <label>Contact Email</label>
-                <input type="text" id="edit_bank_email" value="{{ user.email }}" disabled>
-                <p style="color:#666; font-size:0.9em; margin-bottom:10px;">Contact admin to change locked settings.</p>
-                <div style="margin-top: 12px;">
-                    <button type="button" onclick="alert('Profile Settings Sent.')" class="primary-btn"
-                        style="width: 100%;">Save Base Profile</button>
-                </div>
-            </div>
-        </div>
-        {% endif %}
     </main>
 
     <!-- Modal for Drive -->
@@ -451,6 +615,17 @@
     </footer>
 
     <script>
+        document.querySelectorAll('.sidebar-menu li').forEach(item => {
+            item.addEventListener('click', () => {
+                const target = item.dataset.target;
+                item.parentElement.querySelectorAll('li').forEach(li => li.classList.remove('active'));
+                item.classList.add('active');
+                const contentArea = item.closest('.profile-layout').querySelector('.profile-content');
+                contentArea.querySelectorAll('.profile-section').forEach(sec => sec.classList.remove('active'));
+                document.getElementById(target).classList.add('active');
+            });
+        });
+
         document.querySelectorAll('.accept-btn').forEach(btn => {
             btn.addEventListener('click', async () => {
                 const id = btn.dataset.id;
@@ -809,6 +984,18 @@
                     card.classList.remove('emergency-flicker');
                 }, 1000);
             });
+        });
+
+        // Initialize active tab from URL hash if present
+        window.addEventListener('DOMContentLoaded', () => {
+            let hash = window.location.hash;
+            if (hash) {
+                hash = hash.substring(1); // Remove the #
+                const targetTab = document.querySelector(`.sidebar-menu li[data-target="${hash}"]`);
+                if (targetTab) {
+                    targetTab.click();
+                }
+            }
         });
     </script>
 
