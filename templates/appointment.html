@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>BloodConnect — Schedule Appointment</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+
+<body class="has-bottom-nav">
+
+    <nav class="navbar">
+        <div class="menu">☰</div>
+        <div class="logo">BloodConnect</div>
+        <div class="nav-links">
+            <a href="/logout">Logout</a>
+        </div>
+    </nav>
+
+    <main class="profile-layout" style="padding-top: 80px;">
+        <div class="profile-content" style="margin: 0 auto; max-width: 800px;">
+            <div class="section-header">
+                <h2>Schedule Blood Donation Appointment</h2>
+                <p>Select a nearby blood bank and book your appointment.</p>
+            </div>
+
+            <div class="appointment-form" style="background: #fff; padding: 25px; border-radius: 14px; border: 1px solid #ffe3e3; margin-bottom: 20px;">
+                <h3>Appointment Details</h3>
+                <form id="appointmentForm">
+                    <div style="margin-bottom: 15px;">
+                        <label>Preferred Date</label>
+                        <input type="date" id="appointment_date" required>
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <label>Preferred Time</label>
+                        <input type="time" id="appointment_time" required>
+                    </div>
+                    <div style="margin-bottom: 15px;">
+                        <label>Additional Notes (optional)</label>
+                        <textarea id="appointment_notes" placeholder="Any special requirements or notes"></textarea>
+                    </div>
+                </form>
+            </div>
+
+            <div class="section-header">
+                <h3>Nearby Blood Banks</h3>
+            </div>
+            <div class="card-grid" id="banksList">
+                {% for bank in blood_banks %}
+                <div class="notification-card bank-card" data-id="{{ bank[0] }}" data-name="{{ bank[1] }}" data-distance="{% if bank|length > 7 %}{{ bank[7] | round(1) }} km{% else %}Distance unknown{% endif %}">
+                    <h3>{{ bank[1] }}</h3>
+                    <p><strong>Address:</strong> {{ bank[4] }}</p>
+                    <p><strong>Phone:</strong> {{ bank[3] }}</p>
+                    <p><strong>Distance:</strong> {% if bank|length > 7 %}{{ bank[7] | round(1) }} km{% else %}Unknown{% endif %}</p>
+                    <button class="action-btn primary-btn book-btn" data-bank-id="{{ bank[0] }}">Book Appointment</button>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </main>
+
+    <footer class="bottom-nav">
+        <a href="/" class="nav-item">
+            <i class="fa-solid fa-house"></i>
+            <span>Home</span>
+        </a>
+        <a href="/profile" class="nav-item active">
+            <i class="fa-solid fa-user"></i>
+            <span>Dashboard</span>
+        </a>
+    </footer>
+
+    <script>
+        document.querySelectorAll('.book-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const bankId = btn.dataset.bankId;
+                const date = document.getElementById('appointment_date').value;
+                const time = document.getElementById('appointment_time').value;
+                const notes = document.getElementById('appointment_notes').value;
+
+                if (!date || !time) {
+                    alert('Please select date and time');
+                    return;
+                }
+
+                fetch('/book-appointment', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ bank_id: bankId, date, time, notes })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        alert('Appointment booked successfully!');
+                        // Redirect or update UI
+                    } else {
+                        alert(data.message || 'Failed to book appointment');
+                    }
+                });
+            });
+        });
+    </script>
+
+</body>
+
+</html>

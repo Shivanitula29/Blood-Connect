@@ -1381,3 +1381,35 @@ input:checked + .slider:before {
     margin: 5px 0 0;
     color: #666;
 }
+
+/* Badge Animations */
+.badge-item {
+    animation: badgeGlow 2s ease-in-out infinite alternate;
+}
+
+@keyframes badgeGlow {
+    from {
+        box-shadow: 0 0 10px rgba(214, 51, 51, 0.2);
+        transform: scale(1);
+    }
+    to {
+        box-shadow: 0 0 20px rgba(214, 51, 51, 0.4);
+        transform: scale(1.05);
+    }
+}
+
+.badge-download-btn {
+    background: #d63333;
+    color: white;
+    border: none;
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 14px;
+    margin-top: 10px;
+    transition: background 0.3s;
+}
+
+.badge-download-btn:hover {
+    background: #a61e1e;
+}

@@ -80,12 +80,7 @@
             <h3>View Achievements</h3>
             <p>Check your donation milestones and badges.</p>
         </div>
-        <div class="action-card" onclick="location.href='{{ '/profile#dashboard' if user else '/login?next=/profile%23dashboard' }}'">
-            <div class="icon-circle"><i class="fa-solid fa-user"></i></div>
-            <h3>My Dashboard</h3>
-            <p>View your donation history and manage your profile.</p>
-        </div>
-        <div class="action-card" onclick="location.href='{{ '/profile#dashboard' if user else '/login?next=/profile%23dashboard' }}'">
+        <div class="action-card" onclick="location.href='{{ '/appointment' if user else '/login?next=/appointment' }}'">
             <div class="icon-circle"><i class="fa-solid fa-calendar-alt"></i></div>
             <h3>Schedule Appointment</h3>
             <p>Book a donation appointment at your convenience.</p>
@@ -151,7 +146,7 @@
         </a>
         <a href="/profile" class="nav-item">
             <i class="fa-solid fa-user"></i>
-            <span>Profile</span>
+            <span>Dashboard</span>
         </a>
     </footer>
     {% endif %}

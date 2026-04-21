@@ -1,4 +1,8 @@
-from flask import Flask, redirect, request, jsonify, render_template, session
+from flask import Flask, redirect, request, jsonify, render_template, session, send_file
+from flask import send_file
+from io import BytesIO
+from reportlab.pdfgen import canvas
+from datetime import datetime
 from flask_cors import CORS
 from functools import wraps
 from database import (
@@ -48,6 +52,9 @@ from database import (
     get_badges_by_user,
     get_user_by_referral_code
 )
+from io import BytesIO
+from reportlab.pdfgen import canvas
+from datetime import datetime
 import sqlite3
 from math import radians, sin, cos, sqrt, atan2
 
@@ -1042,6 +1049,105 @@ def update_profile():
         return jsonify({'success': False, 'message': str(e)})
 
 
+@app.route('/check-eligibility')
+@login_required
+def check_eligibility():
+    user_id = session['user']['id']
+    user = get_user_by_id(user_id)
+    if not user:
+        return jsonify({'eligible': False, 'message': 'User not found'})
+
+    age = user[5]
+    weight = user[6]
+    last_donated = user[11]
+    is_donor = user[12]
+
+    # Check basic eligibility
+    if not age or age < 18:
+        return jsonify({'eligible': False, 'message': 'You must be at least 18 years old to donate blood.'})
+
+    if not weight or weight < 50:
+        return jsonify({'eligible': False, 'message': 'You must weigh at least 50 kg to donate blood.'})
+
+    if not is_donor:
+        return jsonify({'eligible': False, 'message': 'You have indicated you are not interested in donating blood.'})
+
+    # Check donation frequency
+    from datetime import datetime, timedelta
+
+    if last_donated:
+        try:
+            last_date = datetime.strptime(last_donated, '%Y-%m-%d')
+            next_date = last_date + timedelta(days=56)
+            today = datetime.now()
+
+            if today < next_date:
+                days_left = (next_date - today).days
+                return jsonify({
+                    'eligible': False,
+                    'message': f'You donated blood on {last_donated}. You can donate again in {days_left} days.',
+                    'next_donation': next_date.strftime('%Y-%m-%d')
+                })
+            else:
+                return jsonify({
+                    'eligible': True,
+                    'message': 'You are eligible to donate blood.',
+                    'next_donation': None
+                })
+        except ValueError:
+            # Invalid date format
+            return jsonify({'eligible': True, 'message': 'You are eligible to donate blood.'})
+    else:
+        # First donation
+        return jsonify({
+            'eligible': True,
+            'message': 'You are eligible to donate blood. This appears to be your first donation.'
+        })
+
+
+@app.route('/appointment')
+@login_required
+def appointment_page():
+    user = session['user']
+    blood_banks = get_all_blood_banks()
+    
+    # Get user's location
+    user_lat = user.get('latitude')
+    user_lon = user.get('longitude')
+    
+    if not user_lat or not user_lon:
+        # If no location, show all banks without sorting
+        sorted_banks = blood_banks
+    else:
+        # Sort by distance and add distance to each bank
+        for bank in blood_banks:
+            if bank[5] and bank[6]:
+                bank_distance = haversine(float(user_lat), float(user_lon), float(bank[5]), float(bank[6]))
+                bank.append(bank_distance)
+            else:
+                bank.append(None)
+        sorted_banks = sorted(blood_banks, key=lambda b: b[-1] if b[-1] else float('inf'))
+    
+    return render_template("appointment.html", blood_banks=sorted_banks)
+
+
+@app.route('/book-appointment', methods=['POST'])
+@login_required
+def book_appointment():
+    data = request.get_json()
+    bank_id = data.get('bank_id')
+    date = data.get('date')
+    time = data.get('time')
+    notes = data.get('notes', '')
+    
+    if not all([bank_id, date, time]):
+        return jsonify({'success': False, 'message': 'All fields required'})
+    
+    # Here you could save to database, but for now just return success
+    # In real app, add appointment table
+    return jsonify({'success': True, 'message': 'Appointment booked successfully'})
+
+
 @app.route('/request-details')
 @login_required
 def request_details():
@@ -1093,7 +1199,32 @@ def request_details():
         },
         'donors': donors
     })
+@app.route('/results')
+@login_required
+def results():
+    request_id = request.args.get('request_id')
+    refresh = request.args.get('refresh')
+    if not request_id:
+        return "Request ID required", 400
+    req = get_request_by_id(request_id)
+    if not req:
+        return "Request not found", 404
+    donors = get_compatible_donors()
+    return render_template('results.html', request=req, donors=donors, refresh=refresh)
 
+@app.route('/download-certificate/<badge>')
+@login_required
+def download_certificate(badge):
+    buffer = BytesIO()
+    p = canvas.Canvas(buffer)
+    p.drawString(100, 750, "Congratulations on your blood donation!")
+    p.drawString(100, 730, f"Badge: {badge.replace('_', ' ').title()}")
+    p.drawString(100, 710, f"Date: {datetime.now().strftime('%Y-%m-%d')}")
+    p.drawString(100, 690, "BloodConnect - Connecting Donors with Those in Need")
+    p.showPage()
+    p.save()
+    buffer.seek(0)
+    return send_file(buffer, as_attachment=True, download_name=f'certificate_{badge}.pdf', mimetype='application/pdf')
 
 # ---------- RUN ----------
 if __name__ == '__main__':
