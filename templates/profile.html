@@ -119,9 +119,10 @@
                 <li data-target="history">Donation History</li>
                 <li data-target="achievements">Achievements</li>
                 {% elif user.role == 'bank' %}
+                <li data-target="bank-settings">Profile</li>
                 <li class="active" data-target="bank-requests">Incoming Blood Requests</li>
                 <li data-target="bank-drives">My Donation Drives</li>
-                <li data-target="bank-settings">Edit Bank Settings & Stock</li>
+                <li data-target="bank-achievements">Achievements</li>
                 <li data-target="bank-history">Donation History</li>
                 {% endif %}
             </ul>
@@ -457,10 +458,6 @@
 
             {% elif user.role == 'bank' %}
             <section id="bank-requests" class="profile-section active">
-                <div class="profile-hero"
-                    style="margin-bottom: 20px; padding: 0; max-width: none; grid-template-columns: 1fr;">
-                    <h1 style="font-size: 32px; color: #d63333; margin-top:0;">Welcome back, {{ user.name }}!</h1>
-                </div>
                 <div class="section-header">
                     <h2>Incoming Blood Requests</h2>
                     <p>Hospitals and patients explicitly requesting blood from you.</p>
@@ -476,9 +473,9 @@
 
                         {% if req.bank_status == 'pending' %}
                         <div style="margin-top:10px; display:flex; gap:10px;">
-                            <button class="primary-btn bank-action-btn" data-request-id="{{ req.0 }}"
+                            <button class="primary-btn bank-action-btn" data-request-id="{{ req.id }}"
                                 data-action="accept" style="flex:1">Accept</button>
-                            <button class="secondary-btn bank-action-btn" data-request-id="{{ req.0 }}"
+                            <button class="secondary-btn bank-action-btn" data-request-id="{{ req.id }}"
                                 data-action="decline"
                                 style="flex:1; background-color:#ffebee; color:#c1121f; border-color:#c1121f;">Decline</button>
                         </div>
@@ -533,10 +530,69 @@
 
             <section id="bank-settings" class="profile-section">
                 <div class="edit-profile-card">
-                    <h2>Update Inventory</h2>
-                    <p style="margin-bottom:10px; color:#666;">Update your immediate blood stock here so users can find
-                        you.</p>
-                    <form id="updateStockForm">
+                    <div class="profile-hero"
+                        style="margin-bottom: 20px; padding: 0; max-width: none; grid-template-columns: 1fr;">
+                        <h1 style="font-size: 32px; color: #d63333; margin-top:0;">Welcome back, {{ user.name }}!</h1>
+                    </div>
+                    <div class="section-header" style="align-items: center; gap: 15px;">
+                        <h2>Profile</h2>
+                        <p style="margin: 0; color: #666;">Your bank dashboard and settings are managed here.</p>
+                    </div>
+
+                    <div class="card-grid" style="grid-template-columns: repeat(auto-fit,minmax(180px,1fr)); gap:16px; margin-bottom: 26px;">
+                        <div class="stat-box">
+                            <h3>{{ bank_achievements.accepted_requests }}</h3>
+                            <p>Requests accepted</p>
+                        </div>
+                        <div class="stat-box">
+                            <h3>{{ bank_achievements.total_units_supplied }}</h3>
+                            <p>Units supplied</p>
+                        </div>
+                        <div class="stat-box">
+                            <h3>{{ bank_achievements.completed_drives }}</h3>
+                            <p>Drives completed</p>
+                        </div>
+                        <div class="stat-box">
+                            <h3>{{ bank_achievements.inventory_groups }}</h3>
+                            <p>Blood groups stocked</p>
+                        </div>
+                    </div>
+
+                    <div style="margin-top: 20px;">
+                        <h3 style="margin-top:0; color:#c1121f;">Inventory Snapshot</h3>
+                        {% if bank_inventory %}
+                        <div class="card-grid" style="grid-template-columns: repeat(auto-fit,minmax(200px,1fr)); gap:14px; margin-top:12px;">
+                            {% for group, units in bank_inventory.items() %}
+                            <div class="request-card">
+                                <h3>{{ group }}</h3>
+                                <p>{{ units }} units available</p>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <div class="empty-state">No inventory details available yet.</div>
+                        {% endif %}
+                    </div>
+
+                    <div id="bankProfileSection" class="bank-form-card" style="display: none; margin-top: 26px;">
+                        <h3 style="margin-top:0; color:#c1121f;">Bank Profile</h3>
+                        <p style="margin-bottom:12px; color:#666;">Change your bank email securely.</p>
+                        <label>Bank Name</label>
+                        <input type="text" id="edit_bank_name" value="{{ user.name }}" disabled>
+                        <label>Current Email</label>
+                        <input type="email" id="current_bank_email" value="{{ bank_info[7] if bank_info else user.email }}" disabled>
+                        <label>New Email</label>
+                        <input type="email" id="new_bank_email" placeholder="Enter new email address">
+                        <button type="button" onclick="sendEmailVerification()" class="primary-btn" style="width:100%; margin-top:12px;">Send Verification Code</button>
+                        <label style="margin-top:18px;">Verification Code</label>
+                        <input type="text" id="email_verification_code" placeholder="Enter verification code">
+                        <button type="button" onclick="confirmEmailChange()" class="secondary-btn" style="width:100%; margin-top:12px;">Confirm Email Change</button>
+                        <p id="emailUpdateMsg"></p>
+                    </div>
+
+                    <div id="bankStockSection" class="bank-form-card" style="display: none; margin-bottom: 26px;">
+                        <h3 style="margin-top:0; color:#c1121f;">Blood Stock</h3>
+                        <p style="margin-bottom:12px; color:#666;">Update your current inventory when stock changes.</p>
                         <label>Blood Group</label>
                         <select id="update_blood_group">
                             <option value="">Select Blood Group</option>
@@ -549,27 +605,54 @@
                             <option value="AB+">AB+</option>
                             <option value="AB-">AB-</option>
                         </select>
-
                         <label>Units Available</label>
-                        <input type="number" id="update_units" min="0">
-
-                        <button type="button" onclick="updateStock()" class="primary-btn"
-                            style="margin-top:15px; width:100%;">Update Stock</button>
+                        <input type="number" id="update_units" min="0" placeholder="Enter number of units">
+                        <button type="button" onclick="updateStock()" class="primary-btn" style="width:100%; margin-top:12px;">Update Stock</button>
                         <p id="updateMsg"></p>
-                    </form>
+                    </div>
 
-                    <hr style="margin:30px 0; border:1px solid #eee;">
+                    <div class="profile-action-row" style="margin-top: 30px;">
+                        <button type="button" class="secondary-btn" onclick="toggleBankProfileSection()">Edit Profile</button>
+                        <button type="button" class="secondary-btn" onclick="toggleStockSection()">Update Blood Stock</button>
+                    </div>
+                </div>
+            </section>
 
-                    <h2>Edit Bank Settings</h2>
-                    <label>Bank Name</label>
-                    <input type="text" id="edit_bank_name" value="{{ user.name }}" disabled>
-                    <label>Contact Email</label>
-                    <input type="text" id="edit_bank_email" value="{{ user.email }}" disabled>
-                    <p style="color:#666; font-size:0.9em; margin-bottom:10px;">Contact admin to change locked settings.
-                    </p>
-                    <div style="margin-top: 12px;">
-                        <button type="button" onclick="alert('Profile Settings Sent.')" class="primary-btn"
-                            style="width: 100%;">Save Base Profile</button>
+            <section id="bank-achievements" class="profile-section">
+                <div class="section-header">
+                    <h2>Achievements</h2>
+                    <p>Certificates and badges earned by your blood bank.</p>
+                </div>
+                <div class="badge-grid">
+                    <div class="badge-card {% if bank_achievements.total_units_supplied >= 1 %}badge-active{% endif %}">
+                        <div class="icon-circle">🏅</div>
+                        <h4>Supply Starter</h4>
+                        <p>First units supplied.</p>
+                        {% if bank_achievements.total_units_supplied >= 1 %}
+                        <button class="secondary-btn badge-btn">View Certificate</button>
+                        {% else %}
+                        <span class="badge-locked">Locked</span>
+                        {% endif %}
+                    </div>
+                    <div class="badge-card {% if bank_achievements.total_units_supplied >= 25 %}badge-active{% endif %}">
+                        <div class="icon-circle">🌟</div>
+                        <h4>Community Partner</h4>
+                        <p>25+ units supplied.</p>
+                        {% if bank_achievements.total_units_supplied >= 25 %}
+                        <button class="secondary-btn badge-btn">Download Badge</button>
+                        {% else %}
+                        <span class="badge-locked">Locked</span>
+                        {% endif %}
+                    </div>
+                    <div class="badge-card {% if bank_achievements.total_units_supplied >= 75 %}badge-active{% endif %}">
+                        <div class="icon-circle">💎</div>
+                        <h4>Gold Supplier</h4>
+                        <p>75+ units supplied.</p>
+                        {% if bank_achievements.total_units_supplied >= 75 %}
+                        <button class="secondary-btn badge-btn">Share Certificate</button>
+                        {% else %}
+                        <span class="badge-locked">Locked</span>
+                        {% endif %}
                     </div>
                 </div>
             </section>
@@ -718,7 +801,7 @@
         document.querySelectorAll('.request-card-link').forEach(card => {
             card.addEventListener('click', () => {
                 const requestId = card.dataset.requestId;
-                window.location.href = `/results?request_id=${requestId}`;
+                window.location.href = `/results/${requestId}`;
             });
         });
 
@@ -886,18 +969,115 @@
         }
 
         // ---------- BANK FUNCTIONS ----------
-        function toggleBankEdit() {
-            const sec = document.getElementById('editBankSection');
+        function toggleBankProfileSection() {
+            const sec = document.getElementById('bankProfileSection');
+            sec.style.display = sec.style.display === 'none' ? 'block' : 'none';
+            if (sec.style.display === 'block') sec.scrollIntoView({ behavior: 'smooth' });
+        }
+        function toggleStockSection() {
+            const sec = document.getElementById('bankStockSection');
             sec.style.display = sec.style.display === 'none' ? 'block' : 'none';
             if (sec.style.display === 'block') sec.scrollIntoView({ behavior: 'smooth' });
         }
         function updateStock() {
             const group = document.getElementById("update_blood_group").value;
             const units = document.getElementById("update_units").value;
-            if (!group || units === "") { alert("Please select a blood group and enter units."); return; }
-            fetch('/update-bloodbank-stock', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ blood_group: group, units: parseInt(units) }) })
-                .then(r => r.json()).then(d => { if (d.success) { document.getElementById("updateMsg").innerText = "Stock Updated."; } });
+            const msg = document.getElementById("updateMsg");
+
+            if (!group || units === "") {
+                msg.innerText = "Please select a blood group and enter units.";
+                msg.style.color = '#c1121f';
+                return;
+            }
+
+            fetch('/update-bloodbank-stock', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ blood_group: group, units: parseInt(units) })
+            })
+                .then(r => r.json())
+                .then(d => {
+                    if (d.success) {
+                        msg.innerText = "Stock updated successfully.";
+                        msg.style.color = '#1f7a3d';
+                        document.getElementById("update_blood_group").value = "";
+                        document.getElementById("update_units").value = "";
+                    } else {
+                        msg.innerText = d.message || "Unable to update stock.";
+                        msg.style.color = '#c1121f';
+                    }
+                })
+                .catch(() => {
+                    msg.innerText = "Unable to update stock. Please try again.";
+                    msg.style.color = '#c1121f';
+                });
         }
+
+        function sendEmailVerification() {
+            const newEmail = document.getElementById('new_bank_email').value.trim();
+            const msg = document.getElementById('emailUpdateMsg');
+            if (!newEmail) {
+                msg.innerText = "Enter a new email address.";
+                msg.style.color = '#c1121f';
+                return;
+            }
+            msg.innerText = "Sending verification code...";
+            msg.style.color = '#1f7a3d';
+
+            fetch('/send-bank-email-verification', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ new_email: newEmail })
+            })
+                .then(r => r.json())
+                .then(d => {
+                    if (d.success) {
+                        msg.innerText = d.message;
+                        msg.style.color = '#1f7a3d';
+                    } else {
+                        msg.innerText = d.message || 'Unable to send verification code.';
+                        msg.style.color = '#c1121f';
+                    }
+                })
+                .catch(() => {
+                    msg.innerText = 'Unable to send verification code. Please try again.';
+                    msg.style.color = '#c1121f';
+                });
+        }
+
+        function confirmEmailChange() {
+            const code = document.getElementById('email_verification_code').value.trim();
+            const msg = document.getElementById('emailUpdateMsg');
+            if (!code) {
+                msg.innerText = "Enter the verification code.";
+                msg.style.color = '#c1121f';
+                return;
+            }
+            msg.innerText = "Confirming email change...";
+            msg.style.color = '#1f7a3d';
+
+            fetch('/confirm-bank-email-change', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ code })
+            })
+                .then(r => r.json())
+                .then(d => {
+                    if (d.success) {
+                        msg.innerText = d.message;
+                        msg.style.color = '#1f7a3d';
+                        setTimeout(() => location.reload(), 1200);
+                    } else {
+                        msg.innerText = d.message || 'Verification failed.';
+                        msg.style.color = '#c1121f';
+                    }
+                })
+                .catch(() => {
+                    msg.innerText = 'Unable to verify code. Please try again.';
+                    msg.style.color = '#c1121f';
+                });
+        }
+
         function bankAction(reqId, action) {
             fetch('/bank-action', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ request_id: reqId, action: action }) })
                 .then(r => r.json()).then(d => { if (d.success) location.reload() });
@@ -1088,16 +1268,29 @@
         function shareBadge(badgeName) {
             const message = `I earned the ${badgeName} badge on BloodConnect! #BloodDonor #BloodConnect`;
             const url = window.location.href;
+            const text = `${message} ${url}`;
+            function fallback() {
+                if (navigator.clipboard) {
+                    navigator.clipboard.writeText(text).then(() => {
+                        alert('Badge info copied to clipboard!');
+                    }).catch(() => {
+                        prompt('Copy this badge message:', text);
+                    });
+                } else {
+                    prompt('Copy this badge message:', text);
+                }
+            }
+
             if (navigator.share) {
                 navigator.share({
                     title: 'Blood Donation Badge',
                     text: message,
                     url: url
+                }).catch(() => {
+                    fallback();
                 });
             } else {
-                navigator.clipboard.writeText(message + ' ' + url).then(() => {
-                    alert('Badge info copied to clipboard!');
-                });
+                fallback();
             }
         }
 
@@ -1123,7 +1316,7 @@
         }
 
         function refreshDonors(requestId) {
-            window.location.href = `/results?request_id=${requestId}&refresh=1`;
+            window.location.href = `/results/${requestId}?refresh=1`;
         }
     </script>
 

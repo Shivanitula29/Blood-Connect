@@ -1,4 +1,5 @@
 import sqlite3
+from werkzeug.security import generate_password_hash
 
 DB_NAME = "blood.db"
 
@@ -24,7 +25,6 @@ def create_db():
         last_donated TEXT,
         is_donor INTEGER DEFAULT 0,
         is_available INTEGER DEFAULT 1,
-        referral_code TEXT,
         role TEXT DEFAULT 'donor',
         is_admin INTEGER DEFAULT 0
     )
@@ -74,10 +74,24 @@ def create_db():
         deadline TEXT,
         location TEXT,
         description TEXT,
-        status TEXT DEFAULT 'open'
+        status TEXT DEFAULT 'open',
+        registration_limit INTEGER,
+        registration_open INTEGER DEFAULT 1
     )
     ''')
     
+    # Drive Notifications table
+    cur.execute('''
+    CREATE TABLE IF NOT EXISTS drive_notifications(
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        donor_id INTEGER,
+        drive_id INTEGER,
+        message TEXT,
+        created_at TEXT,
+        is_read INTEGER DEFAULT 0
+    )
+    ''')
+
     # Drive Registrations table
     cur.execute('''
     CREATE TABLE IF NOT EXISTS drive_registrations(
@@ -117,16 +131,6 @@ def create_db():
     )
     ''')
 
-    # Referrals table
-    cur.execute('''
-    CREATE TABLE IF NOT EXISTS referrals(
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        referrer_id INTEGER,
-        referred_id INTEGER,
-        date TEXT
-    )
-    ''')
-
     # Stories table
     cur.execute('''
     CREATE TABLE IF NOT EXISTS stories(
@@ -151,6 +155,18 @@ def create_db():
 
     conn.commit()
 
+    cur.execute("PRAGMA table_info(drives)")
+    columns = [row[1] for row in cur.fetchall()]
+    if "status" not in columns:
+        cur.execute("ALTER TABLE drives ADD COLUMN status TEXT DEFAULT 'open'")
+        conn.commit()
+    if "registration_limit" not in columns:
+        cur.execute("ALTER TABLE drives ADD COLUMN registration_limit INTEGER")
+        conn.commit()
+    if "registration_open" not in columns:
+        cur.execute("ALTER TABLE drives ADD COLUMN registration_open INTEGER DEFAULT 1")
+        conn.commit()
+
     cur.execute("PRAGMA table_info(requests)")
     columns = [row[1] for row in cur.fetchall()]
     if "requester_id" not in columns:
@@ -172,9 +188,6 @@ def create_db():
 
     cur.execute("PRAGMA table_info(users)")
     columns = [row[1] for row in cur.fetchall()]
-    if "referral_code" not in columns:
-        cur.execute("ALTER TABLE users ADD COLUMN referral_code TEXT")
-        conn.commit()
     if "role" not in columns:
         cur.execute("ALTER TABLE users ADD COLUMN role TEXT DEFAULT 'donor'")
         conn.commit()
@@ -213,15 +226,16 @@ def seed_test_data():
     bloods = ["A+", "B+", "O+", "O-", "AB+", "A-", "B-", "AB-"]
     locations = ["Bangalore", "Chennai", "Delhi", "Mumbai", "Hyderabad", "Kolkata", "Pune"]
     
+    password_hash = generate_password_hash("password123")
     for i in range(1, 11):
         bg = bloods[i % len(bloods)]
         loc = locations[i % len(locations)]
         lat = 12.9716 + (i * 0.01)
         lon = 77.5946 + (i * 0.01)
-        seed_users.append((f"Test Donor {i} [TESTDATA]", f"testdata+donor{i}@example.com", "password123", f"+1000000{i:04d}", 20+i, 60+i, bg, loc, lat, lon, f"2025-01-{i:02d}", 1, 1))
+        seed_users.append((f"Test Donor {i} [TESTDATA]", f"testdata+donor{i}@example.com", password_hash, f"+1000000{i:04d}", 20+i, 60+i, bg, loc, lat, lon, f"2025-01-{i:02d}", 1, 1))
 
-    seed_users.append(("Test Requester 1 [TESTDATA]", "testdata+requester1@example.com", "password123", "+10000000011", 45, 70, "AB+", "Bangalore", 12.9716, 77.5946, "2025-04-01", 0, 0))
-    seed_users.append(("Test Requester 2 [TESTDATA]", "testdata+requester2@example.com", "password123", "+10000000012", 40, 68, "O+", "Chennai", 13.0827, 80.2707, "2025-05-01", 0, 0))
+    seed_users.append(("Test Requester 1 [TESTDATA]", "testdata+requester1@example.com", password_hash, "+10000000011", 45, 70, "AB+", "Bangalore", 12.9716, 77.5946, "2025-04-01", 0, 0))
+    seed_users.append(("Test Requester 2 [TESTDATA]", "testdata+requester2@example.com", password_hash, "+10000000012", 40, 68, "O+", "Chennai", 13.0827, 80.2707, "2025-05-01", 0, 0))
 
     cur.executemany('''
         INSERT OR IGNORE INTO users (name, email, password, phone, age, weight, blood, location, latitude, longitude, last_donated, is_donor, is_available)
@@ -235,7 +249,7 @@ def seed_test_data():
         loc = locations[i % len(locations)]
         lat = 12.9718 + (i * 0.01)
         lon = 77.5937 + (i * 0.01)
-        seed_banks.append((f"TESTDATA BLOOD BANK {i}", bg, f"+910000001{i:02d}", loc, lat, lon, f"testdata+bank{i}@example.com", "password123"))
+        seed_banks.append((f"TESTDATA BLOOD BANK {i}", bg, f"+910000001{i:02d}", loc, lat, lon, f"testdata+bank{i}@example.com", password_hash))
         
     cur.executemany('''
         INSERT OR IGNORE INTO blood_banks (name, blood_groups_available, phone, location, latitude, longitude, email, password)
@@ -404,12 +418,12 @@ def get_user_by_id(user_id):
 def add_user(name, email, password, phone, age=None, weight=None, blood=None, location=None, last_donated=None, is_donor=0, is_available=0, latitude=None, longitude=None):
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
-    referral_code = generate_referral_code()
     role = 'donor' if is_donor else 'requester'
+    password_hash = generate_password_hash(password)
     cur.execute('''
-        INSERT INTO users (name, email, password, phone, age, weight, blood, location, latitude, longitude, last_donated, is_donor, is_available, referral_code, role)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (name, email, password, phone, age, weight, blood, location, latitude, longitude, last_donated, is_donor, is_available, referral_code, role))
+        INSERT INTO users (name, email, password, phone, age, weight, blood, location, latitude, longitude, last_donated, is_donor, is_available, role)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ''', (name, email, password_hash, phone, age, weight, blood, location, latitude, longitude, last_donated, is_donor, is_available, role))
     conn.commit()
     conn.close()
 
@@ -598,10 +612,11 @@ def get_all_blood_banks():
 def add_blood_bank(name, blood_groups_available, phone, location, email, password, latitude=None, longitude=None):
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
+    password_hash = generate_password_hash(password)
     cur.execute('''
         INSERT INTO blood_banks (name, blood_groups_available, phone, location, latitude, longitude, email, password)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    ''', (name, blood_groups_available, phone, location, latitude, longitude, email, password))
+    ''', (name, blood_groups_available, phone, location, latitude, longitude, email, password_hash))
     conn.commit()
     conn.close()
 
@@ -613,15 +628,37 @@ def get_blood_bank_by_email(email):
     conn.close()
     return bank
 
+def get_blood_bank_by_id(bank_id):
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM blood_banks WHERE id=?", (bank_id,))
+    bank = cur.fetchone()
+    conn.close()
+    return bank
+
+def update_blood_bank_email(bank_id, email):
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("UPDATE blood_banks SET email=? WHERE id=?", (email, bank_id))
+    conn.commit()
+    conn.close()
+
+def update_blood_bank_inventory(bank_id, inventory):
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("UPDATE blood_banks SET blood_groups_available=? WHERE id=?", (inventory, bank_id))
+    conn.commit()
+    conn.close()
+
 # ---------- DRIVES ----------
 
-def create_drive(bank_id, title, date, deadline, location, description):
+def create_drive(bank_id, title, date, deadline, location, description, registration_limit=None):
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
     cur.execute('''
-        INSERT INTO drives (bank_id, title, date, deadline, location, description)
-        VALUES (?, ?, ?, ?, ?, ?)
-    ''', (bank_id, title, date, deadline, location, description))
+        INSERT INTO drives (bank_id, title, date, deadline, location, description, registration_limit)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    ''', (bank_id, title, date, deadline, location, description, registration_limit))
     conn.commit()
     conn.close()
 
@@ -646,14 +683,109 @@ def get_drives_by_bank(bank_id):
     conn.close()
     return drives
 
+
+def get_drive_by_id(drive_id):
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("SELECT * FROM drives WHERE id=?", (drive_id,))
+    drive = cur.fetchone()
+    conn.close()
+    return drive
+
+
+def update_drive_settings(drive_id, bank_id, registration_open=None, registration_limit=None):
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    fields = []
+    values = []
+    if registration_open is not None:
+        fields.append("registration_open = ?")
+        values.append(1 if registration_open else 0)
+    if registration_limit is not None:
+        fields.append("registration_limit = ?")
+        values.append(registration_limit)
+    if not fields:
+        conn.close()
+        return
+    values.extend([drive_id, bank_id])
+    cur.execute(f"UPDATE drives SET {', '.join(fields)} WHERE id=? AND bank_id=?", values)
+    conn.commit()
+    conn.close()
+
+
+def add_drive_notification(donor_id, drive_id, message):
+    from datetime import datetime
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute('''
+        INSERT INTO drive_notifications (donor_id, drive_id, message, created_at, is_read)
+        VALUES (?, ?, ?, ?, 0)
+    ''', (donor_id, drive_id, message, datetime.now().isoformat()))
+    conn.commit()
+    conn.close()
+
+
+def get_drive_notifications_for_donor(donor_id):
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute('''
+        SELECT n.message, n.created_at, d.title
+        FROM drive_notifications n
+        LEFT JOIN drives d ON n.drive_id = d.id
+        WHERE n.donor_id = ?
+        ORDER BY n.id DESC
+    ''', (donor_id,))
+    notes = cur.fetchall()
+    conn.close()
+    return notes
+
+
+def cancel_bank_drive(drive_id, bank_id):
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("SELECT id FROM drives WHERE id=? AND bank_id=?", (drive_id, bank_id))
+    if not cur.fetchone():
+        conn.close()
+        return False
+    cur.execute("UPDATE drives SET status='cancelled' WHERE id=?", (drive_id,))
+    cur.execute("SELECT donor_id FROM drive_registrations WHERE drive_id=?", (drive_id,))
+    registrations = cur.fetchall()
+    conn.commit()
+    conn.close()
+
+    for (donor_id,) in registrations:
+        add_drive_notification(donor_id, drive_id, "Sorry, this donation drive has been called off by the blood bank.")
+    return True
+
+
 def register_for_drive(donor_id, drive_id):
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
+    cur.execute("SELECT status, registration_open, registration_limit FROM drives WHERE id=?", (drive_id,))
+    row = cur.fetchone()
+    if not row:
+        conn.close()
+        return False, 'Drive not found.'
+    status, registration_open, registration_limit = row
+    if status != 'open':
+        conn.close()
+        return False, 'This drive is no longer accepting registrations.'
+    if registration_open == 0:
+        conn.close()
+        return False, 'Registrations for this drive are closed.'
+    if registration_limit is not None:
+        cur.execute("SELECT COUNT(*) FROM drive_registrations WHERE drive_id=?", (drive_id,))
+        count = cur.fetchone()[0]
+        if count >= registration_limit:
+            conn.close()
+            return False, 'This drive has reached its registration limit.'
     cur.execute("SELECT 1 FROM drive_registrations WHERE donor_id=? AND drive_id=?", (donor_id, drive_id))
     if not cur.fetchone():
         cur.execute("INSERT INTO drive_registrations (drive_id, donor_id) VALUES (?, ?)", (drive_id, donor_id))
         conn.commit()
     conn.close()
+    return True, None
+
 
 def cancel_drive_registration(donor_id, drive_id):
     conn = sqlite3.connect(DB_NAME)
@@ -704,34 +836,36 @@ def delete_drive(drive_id, bank_id):
     conn.close()
 
 
-# ---------- REFERRALS ----------
-def add_referral(referrer_id, referred_id):
-    from datetime import datetime
+def delete_drives_by_bank(bank_id):
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
-    cur.execute("INSERT INTO referrals (referrer_id, referred_id, date) VALUES (?, ?, ?)", (referrer_id, referred_id, datetime.now().isoformat()))
+    cur.execute("SELECT id FROM drives WHERE bank_id=?", (bank_id,))
+    drive_ids = [row[0] for row in cur.fetchall()]
+    cur.execute("DELETE FROM drives WHERE bank_id=?", (bank_id,))
+    cur.executemany("DELETE FROM drive_registrations WHERE drive_id=?", [(drive_id,) for drive_id in drive_ids])
     conn.commit()
     conn.close()
 
-def get_referrals_by_user(user_id):
+
+def delete_blood_bank(bank_id):
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
-    cur.execute("SELECT * FROM referrals WHERE referrer_id=?", (user_id,))
-    refs = cur.fetchall()
+    delete_drives_by_bank(bank_id)
+    cur.execute("DELETE FROM blood_banks WHERE id=?", (bank_id,))
+    conn.commit()
     conn.close()
-    return refs
 
-def get_user_by_referral_code(code):
+
+def delete_user(user_id):
     conn = sqlite3.connect(DB_NAME)
     cur = conn.cursor()
-    cur.execute("SELECT * FROM users WHERE referral_code=?", (code,))
-    user = cur.fetchone()
+    cur.execute("DELETE FROM users WHERE id=?", (user_id,))
+    cur.execute("DELETE FROM notifications WHERE donor_id=?", (user_id,))
+    cur.execute("DELETE FROM drive_registrations WHERE donor_id=?", (user_id,))
+    cur.execute("DELETE FROM drive_notifications WHERE donor_id=?", (user_id,))
+    conn.commit()
     conn.close()
-    return user
 
-def generate_referral_code():
-    import uuid
-    return str(uuid.uuid4())[:8].upper()
 
 # ---------- STORIES ----------
 def add_story(user_id, content, image_url=None, privacy='public'):

@@ -30,6 +30,12 @@
         <p>Select donors and blood banks to send your request to</p>
     </div>
 
+    {% if request_status %}
+    <div class="alert-message" style="background: #eef7ff; color: #034f84; border-left: 4px solid #1f7a3d; margin-bottom: 16px;">
+        <strong>Request status:</strong> {{ request_status }}{% if sent_to_count is not none %} · Sent to {{ sent_to_count }} target(s){% endif %}
+    </div>
+    {% endif %}
+
     {% if donor_message %}
     <div class="alert-message">
         {{ donor_message }}
@@ -43,21 +49,29 @@
         <div class="split-results">
 
             <div class="results-column">
-                <div class="section-header" style="display: flex; justify-content: space-between; align-items: center;">
-                    <h3 class="section-title">Compatible Donors</h3>
-                    <button type="button" class="secondary-btn" onclick="selectAllDonors()">Select All Donors</button>
+                <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                    <div>
+                        <h3 class="section-title">Compatible Donors</h3>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <input id="donorSearch" type="text" placeholder="Search donors by name, blood or location" oninput="filterDonors()" style="padding: 8px 12px; border: 1px solid #ccc; border-radius: 8px; min-width:240px;">
+                        <button type="button" class="secondary-btn" onclick="selectAllDonors()">Select All Donors</button>
+                    </div>
                 </div>
 
                 {% if donors %}
                 <div class="donor-grid two-col-grid">
                     {% for donor in donors %}
-                    <div class="donor-card">
+                    <div class="donor-card" data-name="{{ donor.name|lower }}" data-blood="{{ donor.blood|lower }}" data-location="{{ donor.location|lower }}" data-requested="{{ 'true' if donor.already_requested else 'false' }}">
                         <div style="display: flex; align-items: flex-start; gap: 10px;">
-                            <input type="checkbox" name="selected_donors" value="{{ donor.id }}" onchange="checkSelections()">
+                            <input type="checkbox" name="selected_donors" value="{{ donor.id }}" onchange="checkSelections()" {% if donor.already_requested %}checked{% endif %}>
                             <div style="flex: 1;" onclick="openDonorModal('{{ donor.name }}','{{ donor.blood }}','{{ donor.phone }}','{{ donor.location }}','{{ donor.last_donated }}')">
                                 <span class="tag">{{ donor.blood }}</span>
                                 <h3>{{ donor.name }}</h3>
                                 <p><b>Location:</b> {{ donor.location }}</p>
+                                {% if donor.already_requested %}
+                                    <p style="margin: 3px 0; color: #357a38; font-weight: 600;">Already requested</p>
+                                {% endif %}
                                 <p><b>Last Donated:</b> {{ donor.last_donated }}</p>
                                 {% if donor.distance is not none %}
                                     <p><b>Distance:</b> {{ "%.2f"|format(donor.distance) }} km away</p>
@@ -79,17 +93,22 @@
             </div>
 
             <div class="results-column">
-                <div class="section-header" style="display: flex; justify-content: space-between; align-items: center;">
-                    <h3 class="section-title">Nearby Blood Banks</h3>
-                    <button type="button" class="secondary-btn" onclick="selectAllBanks()">Select All Blood Banks</button>
+                <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                    <div>
+                        <h3 class="section-title">Nearby Blood Banks</h3>
+                    </div>
+                    <div style="display:flex; align-items:center; gap:8px;">
+                        <input id="bankSearch" type="text" placeholder="Search banks by name or location" oninput="filterBanks()" style="padding: 8px 12px; border: 1px solid #ccc; border-radius: 8px; min-width:240px;">
+                        <button type="button" class="secondary-btn" onclick="selectAllBanks()">Select All Blood Banks</button>
+                    </div>
                 </div>
 
                 {% if blood_banks %}
                 <div class="donor-grid two-col-grid">
                     {% for bank in blood_banks %}
-                    <div class="donor-card">
+                    <div class="donor-card" data-name="{{ bank.name|lower }}" data-location="{{ bank.location|lower }}" data-requested="{{ 'true' if bank.already_requested else 'false' }}">
                         <div style="display: flex; align-items: flex-start; gap: 10px;">
-                            <input type="checkbox" name="selected_banks" value="{{ bank.id }}" onchange="checkSelections()">
+                            <input type="checkbox" name="selected_banks" value="{{ bank.id }}" onchange="checkSelections()" {% if bank.already_requested %}checked{% endif %}>
                             <div style="flex: 1;" data-name="{{ bank.name|e }}"
                                  data-phone="{{ bank.phone|e }}"
                                  data-location="{{ bank.location|e }}"
@@ -99,6 +118,9 @@
                                 <span class="tag">{{ requested_blood }}</span>
                                 <h3>{{ bank.name }}</h3>
                                 <p><b>Location:</b> {{ bank.location }}</p>
+                                {% if bank.already_requested %}
+                                    <p style="margin: 3px 0; color: #357a38; font-weight: 600;">Already requested</p>
+                                {% endif %}
                                 {% if bank.distance is not none %}
                                     <p><b>Distance:</b> {{ "%.2f"|format(bank.distance) }} km away</p>
                                 {% else %}
@@ -276,6 +298,27 @@ function checkSelections() {
     } else {
         sendBtn.style.display = 'none';
     }
+}
+
+function filterDonors() {
+    const query = document.getElementById('donorSearch').value.toLowerCase().trim();
+    document.querySelectorAll('.donor-card[data-name]').forEach(card => {
+        const name = card.dataset.name || '';
+        const blood = card.dataset.blood || '';
+        const location = card.dataset.location || '';
+        const visible = query === '' || name.includes(query) || blood.includes(query) || location.includes(query);
+        card.style.display = visible ? 'block' : 'none';
+    });
+}
+
+function filterBanks() {
+    const query = document.getElementById('bankSearch').value.toLowerCase().trim();
+    document.querySelectorAll('.donor-card[data-name][data-location]').forEach(card => {
+        const name = card.dataset.name || '';
+        const location = card.dataset.location || '';
+        const visible = query === '' || name.includes(query) || location.includes(query);
+        card.style.display = visible ? 'block' : 'none';
+    });
 }
 </script>
 

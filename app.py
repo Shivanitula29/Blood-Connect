@@ -1,10 +1,11 @@
+import os
 from flask import Flask, redirect, request, jsonify, render_template, session, send_file
-from flask import send_file
 from io import BytesIO
 from reportlab.pdfgen import canvas
-from datetime import datetime
+from datetime import datetime, timedelta
 from flask_cors import CORS
 from functools import wraps
+from werkzeug.security import check_password_hash
 from database import (
     get_all_users,
     get_all_blood_banks,
@@ -33,6 +34,9 @@ from database import (
     get_blood_banks_for_request,
     delete_request,
     get_blood_bank_by_email,
+    get_blood_bank_by_id,
+    update_blood_bank_email,
+    update_blood_bank_inventory,
     get_bank_requests,
     update_bank_request_status,
     create_drive,
@@ -43,23 +47,26 @@ from database import (
     get_drive_registrations,
     complete_drive,
     delete_drive,
-    add_referral,
-    get_referrals_by_user,
-    generate_referral_code,
+    update_drive_settings,
+    cancel_bank_drive,
+    get_drive_notifications_for_donor,
+    delete_user,
+    delete_blood_bank,
+    get_all_requests,
     add_story,
     get_stories,
     add_badge,
-    get_badges_by_user,
-    get_user_by_referral_code
+    get_badges_by_user
 )
 from io import BytesIO
 from reportlab.pdfgen import canvas
-from datetime import datetime
 import sqlite3
 from math import radians, sin, cos, sqrt, atan2
+import random
+import time
 
 app = Flask(__name__)
-app.secret_key = "supersecretkey"
+app.secret_key = os.environ.get('SECRET_KEY', 'change-me-dev-key')
 CORS(app)
 
 ensure_schema()
@@ -275,8 +282,6 @@ def signup_page():
         longitude = request.form.get("longitude", "")
         is_donor = int(request.form.get("is_donor", 0))
         last_donated = request.form.get("last_donated") or None
-        referral_code = request.form.get("referral_code", "").strip()
-
         # Backend validations
         if not name or len(name) < 2:
             return render_template("signup.html", error="Name must be at least 2 characters long.")
@@ -315,17 +320,11 @@ def signup_page():
 
         try:
             add_user(name, email, password, phone, age_num, weight_num, blood, location, last_donated, is_donor, is_available, float(latitude), float(longitude))
-            new_user = get_user_by_email_or_phone(email)
-            if referral_code and new_user:
-                referrer = get_user_by_referral_code(referral_code)
-                if referrer:
-                    add_referral(referrer[0], new_user[0])
             return render_template("login.html", success="Account created successfully! Please log in.")
         except Exception as e:
             return render_template("signup.html", error="Could not create account. Please try again.")
 
-    ref = request.args.get('ref')
-    return render_template("signup.html", referral_code=ref)
+    return render_template("signup.html")
 
 
 @app.route('/login', methods=['GET', 'POST'])
@@ -335,7 +334,7 @@ def login_page():
         password = request.form.get("password")
 
         user = get_user_by_email_or_phone(identifier)
-        if user and user[3] == password:
+        if user and (check_password_hash(user[3], password) or user[3] == password):
             session['user'] = {
                 "id": user[0],
                 "name": user[1],
@@ -349,7 +348,7 @@ def login_page():
             return redirect(next_page)
             
         bank = get_blood_bank_by_email(identifier)
-        if bank and bank[8] == password:
+        if bank and (check_password_hash(bank[8], password) or bank[8] == password):
             session['user'] = {
                 "id": bank[0],
                 "name": bank[1],
@@ -422,6 +421,9 @@ def show_results(request_id):
 
     compatible_blood_groups = compat.get(req[4], [req[4]])
     donors = get_compatible_donors()
+    request_notifications = get_notifications_by_request(request_id)
+    requested_donor_ids = {note[1] for note in request_notifications}
+
     donor_list = []
     for donor in donors:
         if donor[0] == session['user']['id']:
@@ -440,9 +442,13 @@ def show_results(request_id):
                 'last_donated': donor[11] or 'Never',
                 'latitude': donor[9],
                 'longitude': donor[10],
-                'distance': distance
+                'distance': distance,
+                'already_requested': donor[0] in requested_donor_ids
             })
     donor_list.sort(key=lambda x: x['distance'] if x['distance'] is not None else float('inf'))
+
+    request_banks = get_blood_banks_for_request(request_id)
+    requested_bank_ids = {bank[0] for bank in request_banks}
 
     blood_banks = get_all_blood_banks()
     bank_list = []
@@ -459,12 +465,30 @@ def show_results(request_id):
                 'location': bank[4],
                 'latitude': bank[4],
                 'longitude': bank[5],
-                'distance': distance
+                'distance': distance,
+                'already_requested': bank[0] in requested_bank_ids
             })
     bank_list.sort(key=lambda x: x['distance'] if x['distance'] is not None else float('inf'))
 
+    request_notes = get_notifications_by_request(request_id)
+    accepted_count = sum(1 for note in request_notes if note[3] == 'accepted')
+    pending_count = sum(1 for note in request_notes if note[3] == 'pending')
+    declined_count = sum(1 for note in request_notes if note[3] == 'declined')
+    completed_count = sum(1 for note in request_notes if note[3] == 'completed')
+    sent_to_count = len({note[1] for note in request_notes}) + len(get_blood_banks_for_request(request_id))
+    if accepted_count:
+        request_status = f"{accepted_count} accepted, {pending_count} pending"
+    elif pending_count:
+        request_status = "Waiting for donor responses"
+    elif declined_count:
+        request_status = "All donor responses declined"
+    else:
+        request_status = "No requests sent yet"
+
     return render_template('results.html',
         request_id=request_id,
+        request_status=request_status,
+        sent_to_count=sent_to_count,
         patient_name=req[1],
         patient_gender=req[2],
         patient_age=req[3],
@@ -495,11 +519,20 @@ def send_request():
     if not req or req[11] != session['user']['id']:
         return "Request not found.", 404
 
-    for donor_id in selected_donors:
-        add_notification(int(donor_id), request_id)
+    existing_notifications = get_notifications_by_request(request_id)
+    existing_donor_ids = {note[1] for note in existing_notifications}
 
+    for donor_id in selected_donors:
+        donor_id_int = int(donor_id)
+        if donor_id_int not in existing_donor_ids:
+            add_notification(donor_id_int, request_id)
+
+    existing_banks = get_blood_banks_for_request(request_id)
+    existing_bank_ids = {bank[0] for bank in existing_banks}
     for bank_id in selected_banks:
-        add_request_blood_bank(request_id, int(bank_id))
+        bank_id_int = int(bank_id)
+        if bank_id_int not in existing_bank_ids:
+            add_request_blood_bank(request_id, bank_id_int)
 
     if is_emergency:
         # For emergency, after sending, redirect to emergency tracker
@@ -515,11 +548,30 @@ def profile_page():
     user = session['user']
     
     if user.get('role') == 'bank':
-        bank_requests = get_bank_requests(user['id'])
+        bank_requests_raw = get_bank_requests(user['id'])
+        bank_requests = []
+        accepted_requests_count = 0
+        for req in bank_requests_raw:
+            bank_status = req[13] if len(req) > 13 else None
+            if bank_status == 'accepted':
+                accepted_requests_count += 1
+            bank_requests.append({
+                'id': req[0],
+                'patient_name': req[1],
+                'blood': req[4],
+                'units_required': req[5],
+                'hospital': req[6],
+                'location': req[8],
+                'bank_status': bank_status
+            })
+
         bank_drives_raw = get_drives_by_bank(user['id'])
         bank_drives = []
+        completed_drives_count = 0
         for d in bank_drives_raw:
             regs = get_drive_registrations(d[0])
+            if d[7] == 'completed':
+                completed_drives_count += 1
             bank_drives.append({
                 'id': d[0],
                 'title': d[2],
@@ -530,7 +582,34 @@ def profile_page():
                 'status': d[7],
                 'registrations': regs
             })
-        return render_template("profile.html", user=user, bank_requests=bank_requests, bank_drives=bank_drives)
+
+        bank_info = get_blood_bank_by_id(user['id'])
+        bank_inventory = {}
+        if bank_info and bank_info[2]:
+            for item in str(bank_info[2]).split(','):
+                if ':' in item:
+                    group, units = item.split(':', 1)
+                    bank_inventory[group.strip()] = int(units) if units.isdigit() else units.strip()
+                elif item.strip():
+                    bank_inventory[item.strip()] = ''
+
+        bank_achievements = {
+            'total_drives': len(bank_drives),
+            'completed_drives': completed_drives_count,
+            'accepted_requests': accepted_requests_count,
+            'inventory_groups': len(bank_inventory),
+            'total_units_supplied': sum(req['units_required'] for req in bank_requests if req['bank_status'] == 'accepted')
+        }
+
+        return render_template(
+            "profile.html",
+            user=user,
+            bank_requests=bank_requests,
+            bank_drives=bank_drives,
+            bank_info=bank_info,
+            bank_inventory=bank_inventory,
+            bank_achievements=bank_achievements
+        )
         
     notifications = get_notifications_for_donor(user['id'])
     donations = get_donations_for_donor(user['id'])
@@ -850,8 +929,14 @@ def create_drive_route():
     deadline = data.get('deadline')
     location = data.get('location')
     description = data.get('description')
-    
-    create_drive(bank_id, title, date, deadline, location, description)
+    registration_limit = data.get('registration_limit')
+    limit_value = None
+    if registration_limit not in (None, ''):
+        try:
+            limit_value = int(registration_limit)
+        except ValueError:
+            return jsonify({'success': False, 'message': 'Registration limit must be a number.'}), 400
+    create_drive(bank_id, title, date, deadline, location, description, registration_limit=limit_value)
     return jsonify({'success': True})
 
 @app.route('/register-drive', methods=['POST'])
@@ -862,7 +947,9 @@ def register_drive_route():
         return jsonify({'success': False}), 403
         
     drive_id = data.get('drive_id')
-    register_for_drive(session['user']['id'], drive_id)
+    success, message = register_for_drive(session['user']['id'], drive_id)
+    if not success:
+        return jsonify({'success': False, 'message': message}), 400
     return jsonify({'success': True})
 
 @app.route('/cancel-drive', methods=['POST'])
@@ -874,6 +961,57 @@ def cancel_drive_route():
     
     drive_id = data.get('drive_id')
     cancel_drive_registration(session['user']['id'], drive_id)
+    return jsonify({'success': True})
+
+@app.route('/cancel-bank-drive', methods=['POST'])
+@login_required
+def cancel_bank_drive_route():
+    data = request.get_json() or request.form
+    if session['user'].get('role') != 'bank':
+        return jsonify({'success': False}), 403
+
+    drive_id = data.get('drive_id')
+    if not drive_id:
+        return jsonify({'success': False, 'message': 'Drive ID required.'}), 400
+
+    canceled = cancel_bank_drive(drive_id, session['user']['id'])
+    if not canceled:
+        return jsonify({'success': False, 'message': 'Drive not found or not authorized.'}), 404
+    return jsonify({'success': True})
+
+@app.route('/update-drive-settings', methods=['POST'])
+@login_required
+def update_drive_settings_route():
+    data = request.get_json() or request.form
+    if session['user'].get('role') != 'bank':
+        return jsonify({'success': False}), 403
+
+    drive_id = data.get('drive_id')
+    if not drive_id:
+        return jsonify({'success': False, 'message': 'Drive ID required.'}), 400
+
+    registration_open = data.get('registration_open')
+    registration_limit = data.get('registration_limit')
+    limit_value = None
+    if registration_limit is not None and registration_limit != '':
+        try:
+            limit_value = int(registration_limit)
+        except ValueError:
+            return jsonify({'success': False, 'message': 'Registration limit must be a number.'}), 400
+
+    update_drive_settings(drive_id, session['user']['id'], registration_open=(registration_open in [True, 'true', '1', 1]), registration_limit=limit_value)
+    return jsonify({'success': True})
+
+@app.route('/delete-account', methods=['POST'])
+@login_required
+def delete_account_route():
+    user = session['user']
+    if user.get('role') == 'bank':
+        delete_blood_bank(user['id'])
+    else:
+        delete_user(user['id'])
+
+    session.pop('user', None)
     return jsonify({'success': True})
 
 @app.route('/complete-drive', methods=['POST'])
@@ -892,16 +1030,116 @@ def complete_drive_route():
 @app.route('/update-bloodbank-stock', methods=['POST'])
 @login_required
 def update_bloodbank_stock():
-    # Assume the user is a bloodbank, for simplicity, use user id as bloodbank id or something.
-    # But since blood_banks table has id, perhaps link users to bloodbanks.
-    # For now, assume user can update their bloodbank stock.
+    if session['user'].get('role') != 'bank':
+        return jsonify({'success': False, 'message': 'Forbidden'}), 403
+
     data = request.get_json() or request.form
-    blood_groups = data.get('blood_groups')
-    # Update the blood_banks table for this user.
-    # But since no link, perhaps add a bloodbank_id to users or something.
-    # To keep simple, assume the user is the bloodbank, and update based on name or something.
-    # Let's add a simple update.
-    return jsonify({'success': True})
+    blood_group = data.get('blood_group')
+    units = data.get('units')
+
+    if not blood_group or units is None:
+        return jsonify({'success': False, 'message': 'Blood group and units are required.'}), 400
+
+    try:
+        units_int = int(units)
+    except ValueError:
+        return jsonify({'success': False, 'message': 'Units must be a number.'}), 400
+
+    bank_info = get_blood_bank_by_id(session['user']['id'])
+    if not bank_info:
+        return jsonify({'success': False, 'message': 'Blood bank not found.'}), 404
+
+    inventory = {}
+    if bank_info[2]:
+        for item in str(bank_info[2]).split(','):
+            if ':' in item:
+                group, count = item.split(':', 1)
+                inventory[group.strip()] = int(count) if count.strip().isdigit() else count.strip()
+            elif item.strip():
+                inventory[item.strip()] = ''
+
+    if units_int <= 0:
+        inventory.pop(blood_group, None)
+    else:
+        inventory[blood_group] = units_int
+
+    inventory_string = ','.join(f"{group}:{count}" for group, count in inventory.items())
+    update_blood_bank_inventory(session['user']['id'], inventory_string)
+
+    return jsonify({
+        'success': True,
+        'message': 'Inventory updated successfully.',
+        'inventory': inventory
+    })
+
+
+@app.route('/send-bank-email-verification', methods=['POST'])
+@login_required
+def send_bank_email_verification():
+    if session['user'].get('role') != 'bank':
+        return jsonify({'success': False, 'message': 'Forbidden'}), 403
+
+    data = request.get_json() or request.form
+    new_email = data.get('new_email', '').strip()
+    if not new_email:
+        return jsonify({'success': False, 'message': 'Please enter a new email.'}), 400
+
+    bank_info = get_blood_bank_by_id(session['user']['id'])
+    if not bank_info:
+        return jsonify({'success': False, 'message': 'Blood bank not found.'}), 404
+
+    verification_code = str(random.randint(100000, 999999))
+    expires_at = (datetime.now() + timedelta(minutes=15)).isoformat()
+
+    session['bank_email_change'] = {
+        'old_email': bank_info[7],
+        'new_email': new_email,
+        'code': verification_code,
+        'expires_at': expires_at
+    }
+    session.modified = True
+
+    print(f"[Email verification] Code sent to {bank_info[7]}: {verification_code}")
+
+    return jsonify({
+        'success': True,
+        'message': 'A verification code has been sent to your current email address. Please enter it to confirm the change.'
+    })
+
+
+@app.route('/confirm-bank-email-change', methods=['POST'])
+@login_required
+def confirm_bank_email_change():
+    if session['user'].get('role') != 'bank':
+        return jsonify({'success': False, 'message': 'Forbidden'}), 403
+
+    data = request.get_json() or request.form
+    code = data.get('code', '').strip()
+    stored = session.get('bank_email_change')
+
+    if not stored:
+        return jsonify({'success': False, 'message': 'No email change request found.'}), 400
+
+    if datetime.now() > datetime.fromisoformat(stored['expires_at']):
+        session.pop('bank_email_change', None)
+        return jsonify({'success': False, 'message': 'Verification code expired.'}), 400
+
+    if code != stored['code']:
+        return jsonify({'success': False, 'message': 'Invalid verification code.'}), 400
+
+    try:
+        update_blood_bank_email(session['user']['id'], stored['new_email'])
+    except Exception as e:
+        return jsonify({'success': False, 'message': 'Could not update email. It may already be in use.'}), 400
+
+    session['user']['email'] = stored['new_email']
+    session.modified = True
+    session.pop('bank_email_change', None)
+
+    return jsonify({
+        'success': True,
+        'message': 'Email updated successfully.'
+    })
 
 
 # ---------- NEW FEATURES ----------
@@ -915,14 +1153,6 @@ def add_story_route():
     privacy = data.get('privacy', 'public')
     add_story(session['user']['id'], content, image_url, privacy)
     return jsonify({"success": True})
-
-@app.route('/get-referral-link')
-@login_required
-def get_referral_link():
-    user = get_user_by_id(session['user']['id'])
-    referral_code = user[14]  # referral_code
-    link = f"{request.host_url}signup?ref={referral_code}"
-    return jsonify({"link": link})
 
 
 # ---------- ADMIN PANEL ----------
@@ -976,24 +1206,6 @@ def delete_user(id):
 
 
 # ---------- API ROUTES ----------
-
-@app.route('/addBloodBank', methods=['POST'])
-def add_blood_bank_route():
-    try:
-        name = request.form['name'].strip()
-        blood_groups_available = request.form['blood_groups_available'].strip().upper()
-        phone = request.form['phone'].strip()
-        location = request.form['location'].strip().lower()
-        latitude = float(request.form['latitude'])
-        longitude = float(request.form['longitude'])
-
-        add_blood_bank(name, blood_groups_available, phone, location, latitude, longitude)
-
-        return render_template("bloodbank.html", success="Blood bank registered successfully")
-
-    except Exception as e:
-        return render_template("bloodbank.html", error=f"Error: {str(e)}")
-
 
 @app.route('/get-user-data')
 @login_required
@@ -1203,14 +1415,11 @@ def request_details():
 @login_required
 def results():
     request_id = request.args.get('request_id')
-    refresh = request.args.get('refresh')
     if not request_id:
         return "Request ID required", 400
-    req = get_request_by_id(request_id)
-    if not req:
-        return "Request not found", 404
-    donors = get_compatible_donors()
-    return render_template('results.html', request=req, donors=donors, refresh=refresh)
+    refresh = request.args.get('refresh')
+    query = f"?refresh={refresh}" if refresh else ""
+    return redirect(f"/results/{request_id}{query}")
 
 @app.route('/download-certificate/<badge>')
 @login_required

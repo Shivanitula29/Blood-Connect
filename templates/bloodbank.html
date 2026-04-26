@@ -94,33 +94,6 @@
     <p id="msg"></p>
 </div>
 
-<div class="card">
-    <h2>Update Blood Stock</h2>
-    <p class="card-subtitle">Update available blood groups and units for your blood bank</p>
-
-    <form id="updateStockForm">
-        <label>Blood Group</label>
-        <select id="update_blood_group">
-            <option value="">Select Blood Group</option>
-            <option value="A+">A+</option>
-            <option value="A-">A-</option>
-            <option value="B+">B+</option>
-            <option value="B-">B-</option>
-            <option value="O+">O+</option>
-            <option value="O-">O-</option>
-            <option value="AB+">AB+</option>
-            <option value="AB-">AB-</option>
-        </select>
-
-        <label>Units Available</label>
-        <input type="number" id="update_units" min="0">
-
-        <button type="button" onclick="updateStock()" class="primary-btn submit-btn">Update Stock</button>
-    </form>
-
-    <p id="updateMsg"></p>
-</div>
-
 <script>
 let debounceTimer;
 let bloodInventory = {};
