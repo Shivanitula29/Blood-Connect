@@ -233,7 +233,7 @@
         }
     </style>
 </head>
-<body>
+<body data-emergency-user-logged-in="{{ 'true' if user else 'false' }}" data-current-request-id="{{ request_id|default('') }}" data-show-tracker="{{ 'true' if show_tracker else 'false' }}">
 
 <div class="navbar">
     <div class="menu">☰</div>
@@ -377,18 +377,19 @@
 <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
 
 <script>
-    const emergencyUserLoggedIn = {{ 'true' if user else 'false'}};
+    const emergencyUserLoggedIn = document.body.dataset.emergencyUserLoggedIn === 'true';
     let trackerMap = null;
     let trackerHospitalMarker = null;
     let trackerDonorMarker = null;
     let trackerAnimation = null;
-    let currentRequestId = {{ request_id | tojson if request_id else 'null' }};
+    let currentRequestId = document.body.dataset.currentRequestId || null;
     let currentDonorId = null;
+    const showTrackerPanelOnLoad = document.body.dataset.showTracker === 'true';
 
-    {% if show_tracker %}
-    showTrackerPanel();
-    pollEmergencyStatus();
-    {% endif %}
+    if (showTrackerPanelOnLoad) {
+        showTrackerPanel();
+        pollEmergencyStatus();
+    }
 
     function showMessage(message, error = false) {
         const msg = document.getElementById('emergencyMsg');

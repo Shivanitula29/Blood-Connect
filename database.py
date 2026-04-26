@@ -166,6 +166,8 @@ def create_db():
     if "registration_open" not in columns:
         cur.execute("ALTER TABLE drives ADD COLUMN registration_open INTEGER DEFAULT 1")
         conn.commit()
+    cur.execute("UPDATE drives SET registration_open = 1 WHERE status='open' AND (registration_open IS NULL OR registration_open = 0)")
+    conn.commit()
 
     cur.execute("PRAGMA table_info(requests)")
     columns = [row[1] for row in cur.fetchall()]
@@ -523,6 +525,29 @@ def get_bank_requests(bank_id):
     reqs = cur.fetchall()
     conn.close()
     return reqs
+
+
+def get_bank_completed_requests(bank_id):
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute('''
+        SELECT r.*, rb.status as bank_status
+        FROM requests r
+        JOIN request_blood_banks rb ON r.id = rb.request_id
+        WHERE rb.bank_id=? AND r.status='completed' AND rb.status='accepted' ORDER BY r.id DESC
+    ''', (bank_id,))
+    reqs = cur.fetchall()
+    conn.close()
+    return reqs
+
+
+def delete_request_blood_bank(request_id, bank_id):
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+    cur.execute("DELETE FROM request_blood_banks WHERE request_id=? AND bank_id=?", (request_id, bank_id))
+    conn.commit()
+    conn.close()
+
 
 def update_bank_request_status(request_id, bank_id, status):
     conn = sqlite3.connect(DB_NAME)

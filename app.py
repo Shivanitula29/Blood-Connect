@@ -32,6 +32,8 @@ from database import (
     mark_request_completed,
     add_request_blood_bank,
     get_blood_banks_for_request,
+    get_bank_completed_requests,
+    delete_request_blood_bank,
     delete_request,
     get_blood_bank_by_email,
     get_blood_bank_by_id,
@@ -455,16 +457,16 @@ def show_results(request_id):
     for bank in blood_banks:
         if req[12] or req[4] in bank[2]:  # For emergency, show all banks
             distance = None
-            if req[9] and req[10] and bank[4] and bank[5]:
-                distance = haversine(req[9], req[10], bank[4], bank[5])
+            if req[9] and req[10] and bank[5] is not None and bank[6] is not None:
+                distance = haversine(req[9], req[10], bank[5], bank[6])
             bank_list.append({
                 'id': bank[0],
                 'name': bank[1],
                 'blood_groups_available': bank[2],
                 'phone': bank[3],
                 'location': bank[4],
-                'latitude': bank[4],
-                'longitude': bank[5],
+                'latitude': bank[5],
+                'longitude': bank[6],
                 'distance': distance,
                 'already_requested': bank[0] in requested_bank_ids
             })
@@ -552,7 +554,7 @@ def profile_page():
         bank_requests = []
         accepted_requests_count = 0
         for req in bank_requests_raw:
-            bank_status = req[13] if len(req) > 13 else None
+            bank_status = req[-1] if len(req) > 0 else None
             if bank_status == 'accepted':
                 accepted_requests_count += 1
             bank_requests.append({
@@ -563,6 +565,19 @@ def profile_page():
                 'hospital': req[6],
                 'location': req[8],
                 'bank_status': bank_status
+            })
+
+        bank_history_raw = get_bank_completed_requests(user['id'])
+        bank_history = []
+        for req in bank_history_raw:
+            bank_history.append({
+                'id': req[0],
+                'patient_name': req[1],
+                'blood': req[4],
+                'units_required': req[5],
+                'hospital': req[6],
+                'location': req[8],
+                'bank_status': req[-1] if len(req) > 0 else None
             })
 
         bank_drives_raw = get_drives_by_bank(user['id'])
@@ -580,6 +595,9 @@ def profile_page():
                 'location': d[5],
                 'description': d[6],
                 'status': d[7],
+                'registration_limit': d[8] if len(d) > 8 else None,
+                'registration_open': bool(d[9]) if len(d) > 9 else True,
+                'registration_count': len(regs),
                 'registrations': regs
             })
 
@@ -598,7 +616,7 @@ def profile_page():
             'completed_drives': completed_drives_count,
             'accepted_requests': accepted_requests_count,
             'inventory_groups': len(bank_inventory),
-            'total_units_supplied': sum(req['units_required'] for req in bank_requests if req['bank_status'] == 'accepted')
+            'total_units_supplied': sum(req['units_required'] for req in bank_history)
         }
 
         return render_template(
@@ -608,7 +626,8 @@ def profile_page():
             bank_drives=bank_drives,
             bank_info=bank_info,
             bank_inventory=bank_inventory,
-            bank_achievements=bank_achievements
+            bank_achievements=bank_achievements,
+            bank_history=bank_history
         )
         
     notifications = get_notifications_for_donor(user['id'])
@@ -883,6 +902,10 @@ def bank_action():
         update_bank_request_status(request_id, bank_id, 'accepted')
     elif action == 'decline':
         update_bank_request_status(request_id, bank_id, 'declined')
+    elif action == 'delete':
+        delete_request_blood_bank(request_id, bank_id)
+    else:
+        return jsonify({'success': False, 'message': 'Unknown action'}), 400
         
     return jsonify({'success': True})
 
@@ -942,11 +965,19 @@ def create_drive_route():
 @app.route('/register-drive', methods=['POST'])
 @login_required
 def register_drive_route():
-    data = request.get_json() or request.form
     if session['user'].get('role') != 'donor':
-        return jsonify({'success': False}), 403
-        
+        return jsonify({'success': False, 'message': 'Only donors may register for donation drives.'}), 403
+
+    data = request.get_json() or request.form
     drive_id = data.get('drive_id')
+    if not drive_id:
+        return jsonify({'success': False, 'message': 'Drive ID is required.'}), 400
+
+    try:
+        drive_id = int(drive_id)
+    except (TypeError, ValueError):
+        return jsonify({'success': False, 'message': 'Invalid drive ID.'}), 400
+
     success, message = register_for_drive(session['user']['id'], drive_id)
     if not success:
         return jsonify({'success': False, 'message': message}), 400

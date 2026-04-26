@@ -40,18 +40,14 @@
                 <p style="color: #666; font-size: 0.9em; margin-bottom: 20px;">{{ drive.description }}</p>
 
                 {% if user and user.get('role') == 'donor' %}
-                {% if drive.is_registered %}
-                <button class="secondary-btn" style="width: 100%; border-color: #c1121f; color: #c1121f;"
-                    onclick="cancelDrive({{ drive.id }})">Cancel Registration</button>
+                    {% if drive.is_registered %}
+                    <button class="secondary-btn" style="width: 100%; border-color: #c1121f; color: #c1121f;"
+                        onclick="cancelDrive({{ drive.id }})">Cancel Registration</button>
+                    {% else %}
+                    <button class="primary-btn" style="width: 100%;" onclick="registerDrive({{ drive.id }})">Register</button>
+                    {% endif %}
                 {% else %}
-                <button class="primary-btn" style="width: 100%;" onclick="registerDrive({{ drive.id }})">Register for
-                    Drive</button>
-                {% endif %}
-                {% elif user and user.get('role') == 'bank' %}
-                <!-- Banks manage their drives in their profile -->
-                {% else %}
-                <button class="primary-btn" style="width: 100%;" onclick="location.href='/login'">Log in to
-                    Register</button>
+                    <p style="color:#666; text-align:center; margin:0;">Only donor accounts can register for drives.</p>
                 {% endif %}
             </div>
             {% endfor %}
@@ -67,20 +63,48 @@
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ drive_id: driveId })
-            }).then(r => r.json()).then(d => {
-                if (d.success) location.reload();
-                else alert('Failed to register.');
-            });
+            })
+            .then(async r => {
+                if (r.redirected) {
+                    window.location.href = r.url;
+                    return;
+                }
+                const contentType = r.headers.get('Content-Type') || '';
+                if (!contentType.includes('application/json')) {
+                    const text = await r.text();
+                    alert(text || 'Failed to register.');
+                    return;
+                }
+                return r.json();
+            })
+            .then(d => {
+                if (d && d.success) location.reload();
+                else if (d) alert(d.message || 'Failed to register.');
+            }).catch(() => alert('Failed to register.'));
         }
         function cancelDrive(driveId) {
             fetch('/cancel-drive', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ drive_id: driveId })
-            }).then(r => r.json()).then(d => {
-                if (d.success) location.reload();
-                else alert('Failed to cancel registration.');
-            });
+            })
+            .then(async r => {
+                if (r.redirected) {
+                    window.location.href = r.url;
+                    return;
+                }
+                const contentType = r.headers.get('Content-Type') || '';
+                if (!contentType.includes('application/json')) {
+                    const text = await r.text();
+                    alert(text || 'Failed to cancel registration.');
+                    return;
+                }
+                return r.json();
+            })
+            .then(d => {
+                if (d && d.success) location.reload();
+                else if (d) alert(d.message || 'Failed to cancel registration.');
+            }).catch(() => alert('Failed to cancel registration.'));
         }
     </script>
 

@@ -45,56 +45,56 @@
     </section>
 
     <section class="quick-actions">
-        <div class="action-card" onclick="location.href='{{ '/profile' if user else '/login?next=/profile' }}'">
+        <a class="action-card" href="{{ '/profile' if user else '/login?next=/profile' }}">
             <div class="icon-circle"><i class="fa-solid fa-droplet"></i></div>
             <h3>Donate Blood</h3>
             <p>Register as a donor and help save lives in your area today.</p>
-        </div>
-        <div class="action-card" onclick="location.href='{{ '/request' if user else '/login?next=/request' }}'">
+        </a>
+        <a class="action-card" href="{{ '/request' if user else '/login?next=/request' }}">
             <div class="icon-circle"><i class="fa-solid fa-magnifying-glass"></i></div>
             <h3>Find Donors</h3>
             <p>Search compatible donors by blood group and location instantly.</p>
-        </div>
-        <div class="action-card" onclick="location.href='{{ '/bloodbank' if user else '/login?next=/bloodbank' }}'">
+        </a>
+        <a class="action-card" href="{{ '/bloodbank' if user else '/login?next=/bloodbank' }}">
             <div class="icon-circle"><i class="fa-solid fa-hospital"></i></div>
             <h3>Blood Banks</h3>
             <p>Register and discover nearby blood banks with available inventory.</p>
-        </div>
-        <div class="action-card" onclick="location.href='{{ '/emergency' if user else '/login?next=/emergency' }}'">
+        </a>
+        <a class="action-card" href="{{ '/emergency' if user else '/login?next=/emergency' }}">
             <div class="icon-circle"><i class="fa-solid fa-triangle-exclamation"></i></div>
             <h3>Emergency</h3>
             <p>Locate nearby donors instantly on the map during urgent situations.</p>
-        </div>
-        <div class="action-card" onclick="location.href='{{ '/drives' if user else '/login?next=/drives' }}'">
+        </a>
+        <a class="action-card" href="{{ '/drives' if user else '/login?next=/drives' }}">
             <div class="icon-circle"><i class="fa-solid fa-calendar"></i></div>
             <h3>Join Drives</h3>
             <p>Participate in organized blood donation drives at various locations.</p>
-        </div>
-        <div class="action-card" onclick="location.href='{{ '/profile#dashboard' if user else '/login?next=/profile%23dashboard' }}'">
+        </a>
+        <a class="action-card" href="{{ '/profile#dashboard' if user else '/login?next=/profile%23dashboard' }}">
             <div class="icon-circle"><i class="fa-solid fa-check-circle"></i></div>
             <h3>Check Eligibility</h3>
             <p>Verify if you are eligible to donate blood.</p>
-        </div>
-        <div class="action-card" onclick="location.href='{{ '/profile#achievements' if user else '/login?next=/profile%23achievements' }}'">
+        </a>
+        <a class="action-card" href="{{ '/profile#achievements' if user else '/login?next=/profile%23achievements' }}">
             <div class="icon-circle"><i class="fa-solid fa-trophy"></i></div>
             <h3>View Achievements</h3>
             <p>Check your donation milestones and badges.</p>
-        </div>
-        <div class="action-card" onclick="location.href='{{ '/appointment' if user else '/login?next=/appointment' }}'">
+        </a>
+        <a class="action-card" href="{{ '/appointment' if user else '/login?next=/appointment' }}">
             <div class="icon-circle"><i class="fa-solid fa-calendar-alt"></i></div>
             <h3>Schedule Appointment</h3>
             <p>Book a donation appointment at your convenience.</p>
-        </div>
-        <div class="action-card" onclick="location.href='{{ '/education' if user else '/login?next=/education' }}'">
+        </a>
+        <a class="action-card" href="{{ '/education' if user else '/login?next=/education' }}">
             <div class="icon-circle"><i class="fa-solid fa-book"></i></div>
             <h3>Education Hub</h3>
             <p>Learn about blood donation myths, benefits, and eligibility.</p>
-        </div>
-        <div class="action-card" onclick="location.href='{{ '/stories' if user else '/login?next=/stories' }}'">
+        </a>
+        <a class="action-card" href="{{ '/stories' if user else '/login?next=/stories' }}">
             <div class="icon-circle"><i class="fa-solid fa-heart"></i></div>
             <h3>Community Stories</h3>
             <p>Read and share inspiring donation stories.</p>
-        </div>
+        </a>
     </section>
 
     <section class="stats-section">

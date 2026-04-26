@@ -223,6 +223,9 @@
                         <button onclick="checkEligibility()" class="primary-btn" style="padding: 14px 30px;">Check My Eligibility</button>
                     </div>
                 </div>
+                <div class="profile-action-row" style="margin-top: 26px;">
+                    <button class="secondary-btn" onclick="deleteAccount()" style="background:#ffebee;color:#c1121f;border-color:#c1121f;">Delete Account</button>
+                </div>
             </section>
 
             <section id="incoming" class="profile-section">
@@ -295,7 +298,7 @@
                         <div style="margin-top: 15px; display: flex; gap: 10px;">
                             <button type="button" class="primary-btn complete-btn" data-request-id="{{ req.id }}"
                                 style="flex: 1;">Mark as Completed</button>
-                            <button type="button" class="secondary-btn" onclick="refreshDonors({{ req.id }})"
+                            <button type="button" class="secondary-btn refresh-donors-btn" data-request-id="{{ req.id }}"
                                 style="flex: 1;">Refresh Donors</button>
                             <button type="button" class="secondary-btn delete-request-btn"
                                 style="background-color: #ffebee; color: #c1121f; flex: 0.5;"
@@ -342,7 +345,7 @@
                         <div style="margin-top: 15px; display: flex; gap: 10px;">
                             <button type="button" class="primary-btn complete-btn" data-request-id="{{ req.id }}"
                                 style="flex: 1;">Mark as Completed</button>
-                            <button type="button" class="secondary-btn" onclick="refreshDonors({{ req.id }})"
+                            <button type="button" class="secondary-btn refresh-donors-btn" data-request-id="{{ req.id }}"
                                 style="flex: 1;">Refresh Donors</button>
                             <button type="button" class="secondary-btn delete-request-btn"
                                 style="background-color: #ffebee; color: #c1121f; flex: 0.5;"
@@ -364,7 +367,7 @@
                 {% if completed_requests %}
                 <div class="card-grid">
                     {% for req in completed_requests %}
-                    <div class="request-card completed-card request-card-link" data-request-id="{{ req.id }}"
+                    <div class="request-card completed-card" data-request-id="{{ req.id }}"
                         data-is-emergency="false">
                         <div class="request-top">
                             <h3>{{ req.patient_name }}</h3>
@@ -406,7 +409,7 @@
                         <p><strong>Hospital:</strong> {{ donation[4] }}</p>
                         <p><strong>Location:</strong> {{ donation[5] }}</p>
                         <p><strong>Units:</strong> {{ donation[6] }}</p>
-                        <button class="primary-btn" onclick="shareDonation({{ loop.index }})" style="margin-top: 10px; background-color: #1f7a3d !important; color: white !important; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: 600;">Share Success</button>
+                        <button class="primary-btn share-donation-btn" style="margin-top: 10px; background-color: #1f7a3d !important; color: white !important; border: none; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-weight: 600;">Share Success</button>
                     </div>
                     {% endfor %}
                 </div>
@@ -468,18 +471,20 @@
                     <div class="request-card {% if req.bank_status == 'accepted' %}completed-card{% endif %}">
                         <h3>{{ req.patient_name }}</h3>
                         <p><strong>Blood Group:</strong> {{ req.blood }} ({{ req.units_required }} units)</p>
-                        <p><strong>Status:</strong> <span class="pill sprint">{{ req.bank_status | capitalize }}</span>
+                        <p><strong>Status:</strong> <span class="pill sprint">{{ req.bank_status | default('pending') | capitalize }}</span>
                         </p>
 
-                        {% if req.bank_status == 'pending' %}
-                        <div style="margin-top:10px; display:flex; gap:10px;">
-                            <button class="primary-btn bank-action-btn" data-request-id="{{ req.id }}"
-                                data-action="accept" style="flex:1">Accept</button>
-                            <button class="secondary-btn bank-action-btn" data-request-id="{{ req.id }}"
-                                data-action="decline"
-                                style="flex:1; background-color:#ffebee; color:#c1121f; border-color:#c1121f;">Decline</button>
+                        <div style="margin-top:10px; display:flex; gap:10px; flex-wrap: wrap;">
+                            {% if req.bank_status in [None, '', 'pending'] %}
+                            <button class="primary-btn bank-action-btn" data-request-id="{{ req.id }}" data-action="accept" style="flex:1">Accept</button>
+                            <button class="secondary-btn bank-action-btn" data-request-id="{{ req.id }}" data-action="decline" style="flex:1; background-color:#ffebee; color:#c1121f; border-color:#c1121f;">Decline</button>
+                            {% elif req.bank_status == 'accepted' %}
+                            <button class="secondary-btn bank-action-btn" data-request-id="{{ req.id }}" data-action="delete" style="flex:1; background-color:#ffebee; color:#c1121f; border-color:#c1121f;">Remove</button>
+                            {% elif req.bank_status == 'declined' %}
+                            <button class="primary-btn bank-action-btn" data-request-id="{{ req.id }}" data-action="accept" style="flex:1">Accept</button>
+                            <button class="secondary-btn bank-action-btn" data-request-id="{{ req.id }}" data-action="delete" style="flex:1; background-color:#ffebee; color:#c1121f; border-color:#c1121f;">Remove</button>
+                            {% endif %}
                         </div>
-                        {% endif %}
                     </div>
                     {% endfor %}
                 </div>
@@ -500,24 +505,57 @@
                 {% if bank_drives %}
                 <div class="card-grid">
                     {% for drive in bank_drives %}
-                    <div class="request-card {% if drive.status == 'completed' %}completed-card{% endif %}">
-                        <h3>{{ drive.title }} <span class="pill" style="float:right">{{ drive.status }}</span></h3>
-                        <p><strong>Date:</strong> {{ drive.date }}</p>
+                    <div class="request-card {% if drive.status == 'completed' %}completed-card{% elif drive.status == 'cancelled' %}emergency-card{% endif %}">
+                        <h3>{{ drive.title }} <span class="pill" style="float:right">{{ drive.status | capitalize }}</span></h3>
+                        <p><strong>Date:</strong> {{ drive.date }} | <strong>Deadline:</strong> {{ drive.deadline }}</p>
+                        <p><strong>Location:</strong> {{ drive.location }}</p>
+                        <p><strong>Registered:</strong> {{ drive.registration_count }}{% if drive.registration_limit %} / {{ drive.registration_limit }} max{% endif %}</p>
+                        <p><strong>Registration:</strong> {{ 'Open' if drive.registration_open and drive.status == 'open' else 'Closed' }}</p>
+
                         {% if drive.status == 'open' %}
-                        {% if drive.registrations %}
-                        <p><strong>Registered Donors:</strong></p>
-                        <div class="accepted-donors">
-                            {% for r in drive.registrations %}
-                            <label style="display:block; margin-bottom:10px;">
-                                <input type="checkbox" class="drive-donor-checkbox-{{ drive.id }}" value="{{ r[0] }}">
-                                {{ r[1] }} ({{ r[3] }}) - {{ r[2] }}
-                            </label>
-                            {% endfor %}
+                        <div class="profile-action-row" style="margin-top: 10px; gap: 10px;">
+                            {% if drive.registration_open %}
+                            <button class="secondary-btn drive-registration-toggle-btn" data-drive-id="{{ drive.id }}" data-drive-action="close" style="flex:1;">Close registrations</button>
+                            {% else %}
+                            <button class="secondary-btn drive-registration-toggle-btn" data-drive-id="{{ drive.id }}" data-drive-action="open" style="flex:1;">Reopen registrations</button>
+                            {% endif %}
+                            <button class="secondary-btn set-drive-limit-btn" data-drive-id="{{ drive.id }}" data-drive-limit="{{ drive.registration_limit if drive.registration_limit is not none else '' }}" style="flex:1;">Set limit</button>
                         </div>
-                        <button class="primary-btn complete-drive-btn" style="margin-top:10px; width:100%"
-                            data-drive-id="{{ drive.id }}">Mark Donated & Finish Drive</button>
+                        {% if drive.registrations %}
+                        <button class="secondary-btn toggle-responses-btn" data-drive-id="{{ drive.id }}" style="margin-top:10px; width:100%;">Responses ({{ drive.registration_count }})</button>
+                        <div id="drive-responses-{{ drive.id }}" style="display:none; margin-top:12px;">
+                            <p style="margin-top:0;"><strong>Registered Donors:</strong></p>
+                            <div class="accepted-donors">
+                                {% for r in drive.registrations %}
+                                <label style="display:block; margin-bottom:10px;">
+                                    <input type="checkbox" class="drive-donor-checkbox-{{ drive.id }}" value="{{ r[0] }}">
+                                    {{ r[1] }} ({{ r[3] }}) - {{ r[2] }}
+                                </label>
+                                {% endfor %}
+                            </div>
+                            <button class="primary-btn complete-drive-btn" style="margin-top:10px; width:100%"
+                                data-drive-id="{{ drive.id }}">Mark Donated & Finish Drive</button>
+                        </div>
                         {% else %}
                         <p style="color:#888;">No registrations yet.</p>
+                        {% endif %}
+                        <button class="secondary-btn cancel-bank-drive-btn" data-drive-id="{{ drive.id }}" style="margin-top:12px; width:100%; background:#ffebee; color:#c1121f; border-color:#c1121f;">Cancel Drive</button>
+                        {% elif drive.status == 'cancelled' %}
+                        <p style="color:#c1121f; margin-top:12px;"><strong>This drive has been cancelled. Registered donors have been notified.</strong></p>
+                        {% elif drive.status == 'completed' %}
+                        <p style="color:#1f7a3d; margin-top:12px;"><strong>This drive is completed.</strong></p>
+                        {% if drive.registrations %}
+                        <button class="secondary-btn toggle-responses-btn" data-drive-id="{{ drive.id }}" style="margin-top:10px; width:100%;">Responses ({{ drive.registration_count }})</button>
+                        <div id="drive-responses-{{ drive.id }}" style="display:none; margin-top:12px;">
+                            <p style="margin-top:0;"><strong>Registered Donors:</strong></p>
+                            <div class="accepted-donors">
+                                {% for r in drive.registrations %}
+                                <div style="display:block; margin-bottom:10px;">
+                                    {{ r[1] }} ({{ r[3] }}) - {{ r[2] }}
+                                </div>
+                                {% endfor %}
+                            </div>
+                        </div>
                         {% endif %}
                         {% endif %}
                     </div>
@@ -611,9 +649,12 @@
                         <p id="updateMsg"></p>
                     </div>
 
-                    <div class="profile-action-row" style="margin-top: 30px;">
+                    <div class="profile-action-row" style="margin-top: 30px; gap: 10px;">
                         <button type="button" class="secondary-btn" onclick="toggleBankProfileSection()">Edit Profile</button>
                         <button type="button" class="secondary-btn" onclick="toggleStockSection()">Update Blood Stock</button>
+                    </div>
+                    <div class="profile-action-row" style="margin-top: 16px;">
+                        <button type="button" class="secondary-btn" onclick="deleteAccount()" style="background:#ffebee;color:#c1121f;border-color:#c1121f;">Delete Account</button>
                     </div>
                 </div>
             </section>
@@ -662,26 +703,16 @@
                     <h2>Donation History</h2>
                     <p>Blood units the bank supplied to any requester.</p>
                 </div>
-                {% set has_accepted = false %}
-                {% if bank_requests %}
-                {% for req in bank_requests %}
-                {% if req.bank_status == 'accepted' %}
-                {% set has_accepted = true %}
-                {% endif %}
-                {% endfor %}
-                {% endif %}
-
-                {% if has_accepted %}
+                {% if bank_history %}
                 <div class="card-grid">
-                    {% for req in bank_requests %}
-                    {% if req.bank_status == 'accepted' %}
+                    {% for req in bank_history %}
                     <div class="request-card completed-card">
                         <h3>{{ req.patient_name }}</h3>
                         <p><strong>Blood Group:</strong> {{ req.blood }} ({{ req.units_required }} units)</p>
-                        <p><strong>Status:</strong> <span class="pill sprint">{{ req.bank_status | capitalize }}</span>
-                        </p>
+                        <p><strong>Hospital:</strong> {{ req.hospital }}</p>
+                        <p><strong>Location:</strong> {{ req.location }}</p>
+                        <p><strong>Status:</strong> <span class="pill sprint">Completed</span></p>
                     </div>
-                    {% endif %}
                     {% endfor %}
                 </div>
                 {% else %}
@@ -709,6 +740,8 @@
             <label>Description</label>
             <textarea id="drive_desc"
                 style="width:100%; padding:10px; border-radius:4px; border:1px solid #ddd;"></textarea>
+            <label>Max Registrations (optional)</label>
+            <input type="number" id="drive_limit" min="1" style="width:100%; padding:10px; border-radius:4px; border:1px solid #ddd;">
             <button class="primary-btn" onclick="submitDrive()" style="margin-top:20px; width:100%;">Organize
                 Drive</button>
         </div>
@@ -834,6 +867,59 @@
                     body: JSON.stringify({ request_id: requestId, action })
                 });
                 location.reload();
+            });
+        });
+
+        document.querySelectorAll('.refresh-donors-btn').forEach(btn => {
+            btn.addEventListener('click', event => {
+                event.stopPropagation();
+                const requestId = btn.dataset.requestId;
+                if (!requestId) return;
+                refreshDonors(requestId);
+            });
+        });
+
+        document.querySelectorAll('.share-donation-btn').forEach(btn => {
+            btn.addEventListener('click', event => {
+                event.stopPropagation();
+                shareDonation();
+            });
+        });
+
+        document.querySelectorAll('.drive-registration-toggle-btn').forEach(btn => {
+            btn.addEventListener('click', event => {
+                event.stopPropagation();
+                const driveId = btn.dataset.driveId;
+                const action = btn.dataset.driveAction;
+                if (!driveId || !action) return;
+                toggleDriveRegistration(driveId, action === 'open');
+            });
+        });
+
+        document.querySelectorAll('.set-drive-limit-btn').forEach(btn => {
+            btn.addEventListener('click', event => {
+                event.stopPropagation();
+                const driveId = btn.dataset.driveId;
+                const limitValue = btn.dataset.driveLimit;
+                setDriveLimit(driveId, limitValue ? Number(limitValue) : null);
+            });
+        });
+
+        document.querySelectorAll('.toggle-responses-btn').forEach(btn => {
+            btn.addEventListener('click', event => {
+                event.stopPropagation();
+                const driveId = btn.dataset.driveId;
+                if (!driveId) return;
+                toggleResponses(driveId);
+            });
+        });
+
+        document.querySelectorAll('.cancel-bank-drive-btn').forEach(btn => {
+            btn.addEventListener('click', event => {
+                event.stopPropagation();
+                const driveId = btn.dataset.driveId;
+                if (!driveId) return;
+                cancelBankDrive(driveId);
             });
         });
 
@@ -1090,9 +1176,69 @@
             let deadline = document.getElementById('drive_deadline').value;
             let location = document.getElementById('drive_location').value;
             let desc = document.getElementById('drive_desc').value;
-            fetch('/create-drive', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, date, deadline, location, description: desc }) })
-                .then(r => r.json()).then(d => { if (d.success) window.location.reload() });
+            let limit = document.getElementById('drive_limit').value;
+            fetch('/create-drive', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title, date, deadline, location, description: desc, registration_limit: limit }) })
+                .then(r => r.json()).then(d => { if (d.success) window.location.reload(); else alert(d.message || 'Unable to create drive.'); });
         }
+
+        function setDriveLimit(driveId, currentLimit) {
+            let value = prompt('Enter a maximum number of registrations for this drive:', currentLimit === null ? '' : currentLimit);
+            if (value === null) return;
+            if (value !== '' && (!Number.isInteger(Number(value)) || Number(value) <= 0)) {
+                alert('Please enter a valid positive number.');
+                return;
+            }
+            fetch('/update-drive-settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ drive_id: driveId, registration_limit: value })
+            }).then(r => r.json()).then(d => {
+                if (d.success) location.reload();
+                else alert(d.message || 'Unable to update drive limit.');
+            });
+        }
+
+        function toggleDriveRegistration(driveId, open) {
+            fetch('/update-drive-settings', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ drive_id: driveId, registration_open: open })
+            }).then(r => r.json()).then(d => {
+                if (d.success) location.reload();
+                else alert(d.message || 'Unable to update registration status.');
+            });
+        }
+
+        function cancelBankDrive(driveId) {
+            if (!confirm('Cancel this drive and notify registered donors?')) return;
+            fetch('/cancel-bank-drive', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ drive_id: driveId })
+            }).then(r => r.json()).then(d => {
+                if (d.success) location.reload();
+                else alert(d.message || 'Unable to cancel drive.');
+            });
+        }
+
+        function toggleResponses(driveId) {
+            const responses = document.getElementById(`drive-responses-${driveId}`);
+            if (!responses) return;
+            responses.style.display = responses.style.display === 'none' ? 'block' : 'none';
+        }
+
+        function deleteAccount() {
+            if (!confirm('Are you sure you want to delete your account? This action cannot be undone.')) return;
+            fetch('/delete-account', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({})
+            }).then(r => r.json()).then(d => {
+                if (d.success) window.location.href = '/';
+                else alert(d.message || 'Unable to delete account.');
+            });
+        }
+
         function completeDrive(driveId) {
             let selected = [];
             document.querySelectorAll(`.drive-donor-checkbox-${driveId}:checked`).forEach(cb => selected.push(cb.value));
@@ -1318,6 +1464,53 @@
         function refreshDonors(requestId) {
             window.location.href = `/results/${requestId}?refresh=1`;
         }
+
+        function handleBankRequestAction(requestId, action) {
+            const actionLabels = {
+                accept: 'accept this request',
+                decline: 'decline this request',
+                delete: 'remove this request from your list'
+            };
+            if (!confirm(`Are you sure you want to ${actionLabels[action] || 'perform this action'}?`)) {
+                return;
+            }
+
+            fetch('/bank-action', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ request_id: requestId, action })
+            })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.success) {
+                        window.location.reload();
+                    } else {
+                        alert(data.message || 'Unable to update the request.');
+                    }
+                })
+                .catch(() => {
+                    alert('Unable to update the request. Please try again.');
+                });
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const emergencyCards = document.querySelectorAll('.emergency-card');
+            emergencyCards.forEach(card => {
+                card.classList.add('emergency-flicker');
+                setTimeout(() => {
+                    card.classList.remove('emergency-flicker');
+                }, 1000);
+            });
+
+            document.querySelectorAll('.bank-action-btn').forEach(button => {
+                button.addEventListener('click', event => {
+                    event.stopPropagation();
+                    const requestId = button.dataset.requestId;
+                    const action = button.dataset.action;
+                    handleBankRequestAction(requestId, action);
+                });
+            });
+        });
     </script>
 
 </body>
