@@ -356,6 +356,8 @@ body {
     min-height: 220px;
     position: relative;
     overflow: hidden;
+    text-decoration: none;
+    color: inherit;
 }
 
 .action-card::before {
@@ -614,6 +616,8 @@ body {
 .success-icon {
     animation: bounceIn 0.8s ease-out 0.2s both;
 }
+
+@media (max-width: 1000px) {
     .quick-actions,
     .stats-section {
         grid-template-columns: repeat(2, 1fr);
@@ -754,11 +758,6 @@ body {
 
 .suggestion-item:hover{
     background:#fff1f1;
-}
-/* Form Progress Indicator */
-    max-width: 1200px;
-    margin: 40px auto 60px;
-    padding: 0 40px;
 }
 
 .results-header{
