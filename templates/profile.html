@@ -431,7 +431,6 @@
                         <div class="icon-circle" style="margin:0 auto 10px;">🏆</div>
                         <h3 style="margin:0; color:#c1121f; font-size:18px;">First Blood Donor</h3>
                         <p style="margin:5px 0 0; color:#666; font-size:14px;">Completed your first donation</p>
-                        <button class="badge-download-btn" onclick="downloadCertificate('first')">Download Certificate</button>
                         <button class="badge-share-btn" onclick="shareBadge('First Blood Donor')">Share Badge</button>
                     </div>
                     {% endif %}
@@ -440,7 +439,6 @@
                         <div class="icon-circle" style="margin:0 auto 10px;">⭐</div>
                         <h3 style="margin:0; color:#c1121f; font-size:18px;">Dedicated Donor</h3>
                         <p style="margin:5px 0 0; color:#666; font-size:14px;">Completed 5 donations</p>
-                        <button class="badge-download-btn" onclick="downloadCertificate('dedicated')">Download Certificate</button>
                         <button class="badge-share-btn" onclick="shareBadge('Dedicated Donor')">Share Badge</button>
                     </div>
                     {% endif %}
@@ -449,7 +447,6 @@
                         <div class="icon-circle" style="margin:0 auto 10px;">💎</div>
                         <h3 style="margin:0; color:#c1121f; font-size:18px;">Hero Donor</h3>
                         <p style="margin:5px 0 0; color:#666; font-size:14px;">Completed 10 donations</p>
-                        <button class="badge-download-btn" onclick="downloadCertificate('hero')">Download Certificate</button>
                         <button class="badge-share-btn" onclick="shareBadge('Hero Donor')">Share Badge</button>
                     </div>
                     {% endif %}
@@ -670,7 +667,7 @@
                         <h4>Supply Starter</h4>
                         <p>First units supplied.</p>
                         {% if bank_achievements.total_units_supplied >= 1 %}
-                        <button class="secondary-btn badge-btn">View Certificate</button>
+                        <button class="secondary-btn badge-btn" onclick="shareBadge('Supply Starter')">Share Badge</button>
                         {% else %}
                         <span class="badge-locked">Locked</span>
                         {% endif %}
@@ -680,7 +677,7 @@
                         <h4>Community Partner</h4>
                         <p>25+ units supplied.</p>
                         {% if bank_achievements.total_units_supplied >= 25 %}
-                        <button class="secondary-btn badge-btn">Download Badge</button>
+                        <button class="secondary-btn badge-btn" onclick="shareBadge('Community Partner')">Share Badge</button>
                         {% else %}
                         <span class="badge-locked">Locked</span>
                         {% endif %}
@@ -690,7 +687,7 @@
                         <h4>Gold Supplier</h4>
                         <p>75+ units supplied.</p>
                         {% if bank_achievements.total_units_supplied >= 75 %}
-                        <button class="secondary-btn badge-btn">Share Certificate</button>
+                        <button class="secondary-btn badge-btn" onclick="shareBadge('Gold Supplier')">Share Badge</button>
                         {% else %}
                         <span class="badge-locked">Locked</span>
                         {% endif %}
