@@ -39,12 +39,17 @@
                 <p><strong>Location:</strong> {{ drive.location }}</p>
                 <p style="color: #666; font-size: 0.9em; margin-bottom: 20px;">{{ drive.description }}</p>
 
-                {% if user and user.get('role') == 'donor' %}
+                {% if user and user.role == 'donor' %}
                     {% if drive.is_registered %}
-                    <button class="secondary-btn" style="width: 100%; border-color: #c1121f; color: #c1121f;"
-                        onclick="cancelDrive({{ drive.id }})">Cancel Registration</button>
+                    <form method="post" action="/cancel-drive" style="margin:0;">
+                        <input type="hidden" name="drive_id" value="{{ drive.id }}">
+                        <button type="submit" class="secondary-btn" style="width: 100%; border-color: #c1121f; color: #c1121f;">Cancel Registration</button>
+                    </form>
                     {% else %}
-                    <button class="primary-btn" style="width: 100%;" onclick="registerDrive({{ drive.id }})">Register</button>
+                    <form method="post" action="/register-drive" style="margin:0;">
+                        <input type="hidden" name="drive_id" value="{{ drive.id }}">
+                        <button type="submit" class="primary-btn" style="width: 100%;">Register</button>
+                    </form>
                     {% endif %}
                 {% else %}
                     <p style="color:#666; text-align:center; margin:0;">Only donor accounts can register for drives.</p>

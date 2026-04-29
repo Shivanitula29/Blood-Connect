@@ -377,7 +377,7 @@ def logout():
 @app.route('/requestBlood', methods=['POST'])
 @login_required
 def request_blood():
-    data = request.get_json() or request.form
+    data = request.get_json(silent=True) or request.form
     patient_name = data.get('patient_name')
     gender = data.get('gender')
     age = data.get('age')
@@ -827,7 +827,7 @@ def emergency_status():
 @app.route('/complete-request', methods=['POST'])
 @login_required
 def complete_request_route():
-    data = request.get_json() or request.form
+    data = request.get_json(silent=True) or request.form
     request_id = data.get('request_id')
     actual_donors = data.get('actual_donors', [])
     actual_banks = data.get('actual_banks', [])
@@ -849,7 +849,7 @@ def complete_request_route():
 @app.route('/delete-request', methods=['POST'])
 @login_required
 def delete_request_route():
-    data = request.get_json() or request.form
+    data = request.get_json(silent=True) or request.form
     request_id = data.get('request_id')
 
     if not request_id:
@@ -866,7 +866,7 @@ def delete_request_route():
 @app.route('/notification-action', methods=['POST'])
 @login_required
 def notification_action():
-    data = request.get_json() or request.form
+    data = request.get_json(silent=True) or request.form
     notification_id = data.get('id')
     action = data.get('action')
     note = get_notification_by_id(notification_id)
@@ -889,7 +889,7 @@ def notification_action():
 @app.route('/bank-action', methods=['POST'])
 @login_required
 def bank_action():
-    data = request.get_json() or request.form
+    data = request.get_json(silent=True) or request.form
     request_id = data.get('request_id')
     action = data.get('action')
     if session['user'].get('role') != 'bank':
@@ -940,7 +940,7 @@ def update_donor_status_route():
 @app.route('/create-drive', methods=['POST'])
 @login_required
 def create_drive_route():
-    data = request.get_json() or request.form
+    data = request.get_json(silent=True) or request.form
     if session['user'].get('role') != 'bank':
         return jsonify({'success': False}), 403
     
@@ -964,38 +964,59 @@ def create_drive_route():
 @login_required
 def register_drive_route():
     if session['user'].get('role') != 'donor':
-        return jsonify({'success': False, 'message': 'Only donors may register for donation drives.'}), 403
+        if request.is_json:
+            return jsonify({'success': False, 'message': 'Only donors may register for donation drives.'}), 403
+        return redirect('/drives')
 
-    data = request.get_json() or request.form
+    data = request.get_json(silent=True) or request.form
     drive_id = data.get('drive_id')
     if not drive_id:
-        return jsonify({'success': False, 'message': 'Drive ID is required.'}), 400
+        if request.is_json:
+            return jsonify({'success': False, 'message': 'Drive ID is required.'}), 400
+        return redirect('/drives')
 
     try:
         drive_id = int(drive_id)
     except (TypeError, ValueError):
-        return jsonify({'success': False, 'message': 'Invalid drive ID.'}), 400
+        if request.is_json:
+            return jsonify({'success': False, 'message': 'Invalid drive ID.'}), 400
+        return redirect('/drives')
 
     success, message = register_for_drive(session['user']['id'], drive_id)
     if not success:
-        return jsonify({'success': False, 'message': message}), 400
-    return jsonify({'success': True})
+        if request.is_json:
+            return jsonify({'success': False, 'message': message}), 400
+        return redirect('/drives')
+    if request.is_json:
+        return jsonify({'success': True})
+    return redirect('/drives')
 
 @app.route('/cancel-drive', methods=['POST'])
 @login_required
 def cancel_drive_route():
-    data = request.get_json() or request.form
+    data = request.get_json(silent=True) or request.form
     if session['user'].get('role') != 'donor':
-        return jsonify({'success': False}), 403
+        if request.is_json:
+            return jsonify({'success': False}), 403
+        return redirect('/drives')
     
     drive_id = data.get('drive_id')
+    try:
+        drive_id = int(drive_id)
+    except (TypeError, ValueError):
+        if request.is_json:
+            return jsonify({'success': False, 'message': 'Invalid drive ID.'}), 400
+        return redirect('/drives')
+
     cancel_drive_registration(session['user']['id'], drive_id)
-    return jsonify({'success': True})
+    if request.is_json:
+        return jsonify({'success': True})
+    return redirect('/drives')
 
 @app.route('/cancel-bank-drive', methods=['POST'])
 @login_required
 def cancel_bank_drive_route():
-    data = request.get_json() or request.form
+    data = request.get_json(silent=True) or request.form
     if session['user'].get('role') != 'bank':
         return jsonify({'success': False}), 403
 
@@ -1011,7 +1032,7 @@ def cancel_bank_drive_route():
 @app.route('/update-drive-settings', methods=['POST'])
 @login_required
 def update_drive_settings_route():
-    data = request.get_json() or request.form
+    data = request.get_json(silent=True) or request.form
     if session['user'].get('role') != 'bank':
         return jsonify({'success': False}), 403
 
@@ -1046,7 +1067,7 @@ def delete_account_route():
 @app.route('/complete-drive', methods=['POST'])
 @login_required
 def complete_drive_route():
-    data = request.get_json() or request.form
+    data = request.get_json(silent=True) or request.form
     if session['user'].get('role') != 'bank':
         return jsonify({'success': False}), 403
     
@@ -1062,7 +1083,7 @@ def update_bloodbank_stock():
     if session['user'].get('role') != 'bank':
         return jsonify({'success': False, 'message': 'Forbidden'}), 403
 
-    data = request.get_json() or request.form
+    data = request.get_json(silent=True) or request.form
     blood_group = data.get('blood_group')
     units = data.get('units')
 
@@ -1108,7 +1129,7 @@ def send_bank_email_verification():
     if session['user'].get('role') != 'bank':
         return jsonify({'success': False, 'message': 'Forbidden'}), 403
 
-    data = request.get_json() or request.form
+    data = request.get_json(silent=True) or request.form
     new_email = data.get('new_email', '').strip()
     if not new_email:
         return jsonify({'success': False, 'message': 'Please enter a new email.'}), 400
@@ -1142,7 +1163,7 @@ def confirm_bank_email_change():
     if session['user'].get('role') != 'bank':
         return jsonify({'success': False, 'message': 'Forbidden'}), 403
 
-    data = request.get_json() or request.form
+    data = request.get_json(silent=True) or request.form
     code = data.get('code', '').strip()
     stored = session.get('bank_email_change')
 
