@@ -18,8 +18,6 @@ from database import (
     get_compatible_donors,
     add_notification,
     get_notifications_for_donor,
-    seed_test_data,
-    clear_test_data,
     get_notification_by_id,
     update_notification_status,
     get_donations_for_donor,
@@ -1205,22 +1203,6 @@ def dashboard():
         return render_template("dashboard.html", donors=donors)
     else:
         return redirect("/admin")
-
-
-@app.route("/seed-test-data")
-def seed_test_data_route():
-    if not session.get("admin"):
-        return redirect("/admin")
-    seed_test_data()
-    return redirect("/dashboard")
-
-
-@app.route("/clear-test-data")
-def clear_test_data_route():
-    if not session.get("admin"):
-        return redirect("/admin")
-    clear_test_data()
-    return redirect("/dashboard")
 
 
 @app.route("/delete/<int:id>")
