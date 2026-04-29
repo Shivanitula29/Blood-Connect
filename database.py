@@ -1,5 +1,8 @@
 import sqlite3
+import random
+from faker import Faker
 from werkzeug.security import generate_password_hash
+
 
 DB_NAME = "blood.db"
 
@@ -838,3 +841,141 @@ def update_donor_status(user_id, is_donor):
     cur.execute('UPDATE users SET is_donor=? WHERE id=?', (is_donor, user_id))
     conn.commit()
     conn.close()
+
+fake = Faker('en_IN')
+
+# ---------- TELUGU NAME DATA ----------
+male_names = [
+    "Suresh", "Mahesh", "Ravi", "Kiran", "Venkatesh",
+    "Naresh", "Rajesh", "Srinivas", "Prasad", "Chiranjeevi",
+    "Ramesh", "Harish", "Manoj", "Anil", "Sai"
+]
+
+female_names = [
+    "Sravani", "Lakshmi", "Anjali", "Harika", "Divya",
+    "Keerthi", "Bhavani", "Padma", "Tejaswini", "Sindhu",
+    "Soumya", "Deepika", "Madhavi", "Swapna", "Kavya"
+]
+
+surnames = [
+    "Reddy", "Naidu", "Rao", "Goud", "Yadav",
+    "Chowdary", "Varma", "Sharma", "Kumar", "Patel"
+]
+
+def generate_telugu_name(gender=None):
+    if gender == "Male":
+        first = random.choice(male_names)
+    elif gender == "Female":
+        first = random.choice(female_names)
+    else:
+        first = random.choice(male_names + female_names)
+
+    last = random.choice(surnames)
+    return f"{first} {last}"
+# ---------- CLEAR OLD TEST DATA ----------
+def clear_test_data():
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+
+    cur.execute("DELETE FROM requests WHERE patient_name LIKE '%[TESTDATA]%' OR hospital LIKE '%[TESTDATA]%'")
+    cur.execute("DELETE FROM blood_banks WHERE name LIKE '%TESTDATA%'")
+    cur.execute("DELETE FROM users WHERE email LIKE 'testdata+%@example.com'")
+
+    conn.commit()
+    conn.close()
+
+    print("🗑️ Old test data deleted")
+
+
+# ---------- SEED DATA ----------
+def seed_test_data(num_users=320, num_requests=300, num_banks=80):
+    conn = sqlite3.connect(DB_NAME)
+    cur = conn.cursor()
+
+    blood_groups = ["A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"]
+
+    locations = [
+        "Hyderabad", "Warangal", "Karimnagar", "Nizamabad",
+        "Khammam", "Nalgonda", "Adilabad",
+        "Vijayawada", "Visakhapatnam", "Guntur",
+        "Tirupati", "Kurnool", "Nellore"
+    ]
+
+    # ---------- USERS ----------
+    print("👤 Seeding users...")
+    for i in range(num_users):
+        cur.execute('''
+            INSERT OR IGNORE INTO users
+            (name, email, password, phone, age, weight, blood, location, is_donor, is_available)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            generate_telugu_name(),  # ✅ FIXED
+            f"user{i}@gmail.com",
+            generate_password_hash(str((i % 9) + 1)),
+            f"+91 90000{i:04d}",
+            random.randint(18, 60),
+            random.randint(50, 90),
+            random.choice(blood_groups),
+            random.choice(locations),
+            random.choice([0, 1]),
+            random.choice([0, 1])
+        ))
+
+    conn.commit()
+
+    # ---------- BLOOD BANKS ----------
+    print("🏥 Seeding blood banks...")
+    for i in range(num_banks):
+        cur.execute('''
+            INSERT OR IGNORE INTO blood_banks
+            (name, blood_groups_available, phone, location, email, password)
+            VALUES (?, ?, ?, ?, ?, ?)
+        ''', (
+            f"{fake.company()} Blood Bank",
+            ",".join(random.sample(blood_groups, random.randint(2, 6))),
+            f"+91 80000{i:04d}",
+            random.choice(locations),
+            f"testdata+bank{i}@gmail.com",
+            generate_password_hash(str((i % 9) + 1))
+        ))
+
+    conn.commit()
+
+    # ---------- REQUESTS ----------
+    print("🩸 Seeding requests...")
+    cur.execute("SELECT id FROM users")
+    user_ids = [row[0] for row in cur.fetchall()]
+
+    for i in range(num_requests):
+        gender = random.choice(["Male", "Female"])
+        name = generate_telugu_name(gender)
+
+        cur.execute('''
+            INSERT INTO requests
+            (patient_name, gender, age, blood, units_required, hospital, contact_number, location, requester_id, is_emergency)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            f"{name} [TESTDATA]",   # ✅ FIXED
+            gender,
+            random.randint(1, 80),
+            random.choice(blood_groups),
+            random.randint(1, 5),
+            f"{fake.company()} Hospital [TESTDATA]",
+            f"+91 70000{i:04d}",
+            random.choice(locations),
+            random.choice(user_ids),
+            random.choice([0, 1])
+        ))
+
+    conn.commit()
+    conn.close()
+
+    print("✅ Test data inserted successfully!")
+
+
+# ---------- MAIN ----------
+if __name__ == "__main__":
+    create_db()
+
+    clear_test_data()   # remove old bad data
+    seed_test_data()    # insert clean Telugu-style data
